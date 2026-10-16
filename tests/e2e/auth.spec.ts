@@ -1,0 +1,85 @@
+import { authDialog, DEMO_USER, expect, login, OTHER_USER, submitLogin, test, waitForMocks } from './support.ts'
+
+test.describe('autenticação e sessão', () => {
+  test('valida o formulário e recusa credenciais erradas', async ({ page }) => {
+    await page.goto('/?auth=login')
+    const dialog = authDialog(page)
+
+    await dialog.getByRole('button', { name: 'Entrar', exact: true }).click()
+    await expect(dialog.getByText('Campo obrigatório.').first()).toBeVisible()
+
+    await dialog.getByLabel('E-mail').fill(DEMO_USER.email)
+    await dialog.getByLabel('Senha', { exact: true }).fill('senha-errada')
+    await dialog.getByRole('button', { name: 'Entrar', exact: true }).click()
+    await expect(dialog.getByRole('alert')).toContainText(/e-mail ou senha/i)
+  })
+
+  test('mantém a sessão após recarregar e encerra no logout', async ({ page }) => {
+    await login(page)
+    await page.reload()
+    await page.goto('/conta/perfil')
+    await expect(page.getByLabel('Nome de exibição')).toHaveValue(DEMO_USER.name)
+
+    await page.getByRole('button', { name: 'Sair' }).click()
+    await expect(page).toHaveURL(/\/($|\?)/)
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('kurio.session'))).toBeNull()
+    await page.goto('/conta/perfil')
+    await expect(authDialog(page)).toBeVisible()
+  })
+
+  test('rota privada pede login e volta para a página pedida', async ({ page }) => {
+    await page.goto('/conta/carteiras')
+    await expect(page).toHaveURL(/auth=login/)
+    await submitLogin(page)
+    await expect(page).toHaveURL(/\/conta\/carteiras$/)
+    await expect(page.getByRole('heading', { name: 'Carteira principal' })).toBeVisible()
+  })
+
+  test('sessão expirada encerra o acesso e pede novo login', async ({ page }) => {
+    await login(page)
+    await page.goto('/conta/perfil')
+    await expect(page.getByLabel('Nome de exibição')).toHaveValue(DEMO_USER.name)
+
+    await page.evaluate(() => window.__kurioMock!.expireSessions())
+    await page.goto('/conta/pedidos')
+    await expect(authDialog(page).getByText('Sua sessão expirou. Entre novamente para continuar.')).toBeVisible()
+
+    await submitLogin(page)
+    await expect(page).toHaveURL(/\/conta\/pedidos/)
+  })
+
+  test('cadastro valida campos e cria a conta', async ({ page }) => {
+    await page.goto('/?auth=signup')
+    const dialog = authDialog(page)
+    await dialog.getByLabel('Nome de usuário').fill('nova.colecionadora')
+    await dialog.getByLabel('E-mail').fill('nova@kurio.com')
+    await dialog.getByLabel('Senha', { exact: true }).fill('segredo123')
+    await dialog.getByLabel('Confirmar senha').fill('outra-senha')
+    await dialog.getByRole('button', { name: /^(Criar conta|Criar perfil)$/ }).click()
+    await expect(dialog.getByText('As senhas não coincidem.')).toBeVisible()
+
+    await dialog.getByLabel('Confirmar senha').fill('segredo123')
+    await dialog.getByRole('button', { name: /^(Criar conta|Criar perfil)$/ }).click()
+    await expect(dialog).toBeHidden()
+    await page.goto('/conta/perfil')
+    await expect(page.getByLabel('Nome de usuário')).toHaveValue('nova.colecionadora')
+  })
+
+  test('dados de um usuário não aparecem para outro', async ({ page }) => {
+    await login(page)
+    await page.goto('/carrinho')
+    await expect(page.getByRole('list', { name: 'Itens do carrinho' }).first()).toContainText('Emerald Ape #042')
+
+    await page.evaluate(() => localStorage.removeItem('kurio.session'))
+    await waitForMocks(page)
+    await login(page, OTHER_USER)
+    await page.goto('/carrinho')
+    await expect(page.getByText('Seu carrinho está vazio')).toBeVisible()
+    await page.goto('/conta/carteiras')
+    await expect(page.getByRole('heading', { name: 'Carteira principal' })).toBeVisible()
+    const leaked = await page.$$eval('input', (inputs) =>
+      inputs.some((input) => (input as HTMLInputElement).value.startsWith('0xa91f')),
+    )
+    expect(leaked).toBe(false)
+  })
+})

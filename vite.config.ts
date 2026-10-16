@@ -17,4 +17,17 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    watch: {
+      // Playwright writes reports while tests run; watching them reloads every open page mid-test.
+      ignored: [
+        '**/playwright-report/**',
+        '**/test-results/**',
+        '**/blob-report/**',
+        '**/.shots/**',
+        '**/.playwright-libs/**',
+        '**/.figma-tmp/**',
+      ],
+    },
+  },
 })

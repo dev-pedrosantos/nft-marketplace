@@ -9,13 +9,6 @@ import type { CheckoutQuote, CollectorDetails, Order } from './types'
 
 const ATTEMPT_STORAGE_KEY = 'kurio.checkout.attempt'
 
-/** One payment attempt: the reviewed quote and the idempotency key sent with every retry of it. */
-interface Attempt {
-  viewer: string
-  idempotencyKey: string
-  quote: CheckoutQuote
-}
-
 export interface CheckoutRequest {
   networkId: string
   expectedTotalEth: DecimalString
@@ -23,11 +16,19 @@ export interface CheckoutRequest {
   collector: CollectorDetails
 }
 
+/** One payment attempt: the reviewed quote and the idempotency key sent with every retry of it. */
+interface Attempt {
+  viewer: string
+  idempotencyKey: string
+  quote: CheckoutQuote
+  request: CheckoutRequest
+}
+
 function readAttempt(viewer: string): Attempt | null {
   try {
     const raw = sessionStorage.getItem(ATTEMPT_STORAGE_KEY)
     const attempt = raw ? (JSON.parse(raw) as Attempt) : null
-    return attempt?.viewer === viewer ? attempt : null
+    return attempt?.viewer === viewer && attempt.request ? attempt : null
   } catch {
     return null
   }
@@ -54,17 +55,23 @@ export function useCheckout({ onPlaced }: { onPlaced: (order: Order) => void }) 
   const busy = useRef(false)
   const [pendingReview, setPendingReview] = useState<{ quote: CheckoutQuote; request: CheckoutRequest } | null>(null)
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null)
+  const [unresolved, setUnresolved] = useState(() => readAttempt(viewer))
 
-  const place = async (attempt: Attempt, request: CheckoutRequest) => {
+  const remember = (attempt: Attempt | null) => {
     saveAttempt(attempt)
+    setUnresolved(attempt)
+  }
+
+  const place = async (attempt: Attempt) => {
+    remember(attempt)
     try {
       const order = await placeOrder.mutateAsync({
         idempotencyKey: attempt.idempotencyKey,
         quoteId: attempt.quote.id,
-        walletProvider: request.walletProvider,
-        collector: request.collector,
+        walletProvider: attempt.request.walletProvider,
+        collector: attempt.request.collector,
       })
-      saveAttempt(null)
+      remember(null)
       onPlaced(order)
     } catch (cause) {
       const apiError = toApiError(cause)
@@ -72,7 +79,7 @@ export function useCheckout({ onPlaced }: { onPlaced: (order: Order) => void }) 
         setError({ message: apiError.message, retryable: true })
         return
       }
-      saveAttempt(null)
+      remember(null)
       setError({ message: apiError.message, retryable: false })
       void queryClient.invalidateQueries({ queryKey: ['cart', viewer] })
     }
@@ -93,7 +100,7 @@ export function useCheckout({ onPlaced }: { onPlaced: (order: Order) => void }) 
     run(async () => {
       const previous = readAttempt(viewer)
       if (previous && previous.quote.networkId === request.networkId) {
-        await place(previous, request)
+        await place(previous)
         return
       }
       let quote: CheckoutQuote
@@ -113,7 +120,14 @@ export function useCheckout({ onPlaced }: { onPlaced: (order: Order) => void }) 
         setPendingReview({ quote, request })
         return
       }
-      await place({ viewer, idempotencyKey: crypto.randomUUID(), quote }, request)
+      await place({ viewer, idempotencyKey: crypto.randomUUID(), quote, request })
+    })
+
+  /** Re-sends an attempt whose outcome is unknown; the server answers with the order if it exists. */
+  const resume = () =>
+    run(async () => {
+      const previous = readAttempt(viewer)
+      if (previous) await place(previous)
     })
 
   const acceptReview = () =>
@@ -121,11 +135,13 @@ export function useCheckout({ onPlaced }: { onPlaced: (order: Order) => void }) 
       if (!pendingReview) return
       const { quote, request } = pendingReview
       setPendingReview(null)
-      await place({ viewer, idempotencyKey: crypto.randomUUID(), quote }, request)
+      await place({ viewer, idempotencyKey: crypto.randomUUID(), quote, request })
     })
 
   return {
     submit,
+    resume,
+    hasUnresolvedAttempt: unresolved !== null,
     acceptReview,
     dismissReview: () => setPendingReview(null),
     pendingReview: pendingReview?.quote ?? null,

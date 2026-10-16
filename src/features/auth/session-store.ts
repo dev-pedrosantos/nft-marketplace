@@ -12,6 +12,8 @@ export interface SessionState {
   session: Session | null
   /** Set when the session ended because it expired, until the user signs in again. */
   expired: boolean
+  /** Where the user was when the session expired; signing in again returns there. */
+  returnTo: string | null
 }
 
 type Listener = () => void
@@ -23,14 +25,25 @@ function isExpired(session: Session) {
   return Date.parse(session.expiresAt) <= Date.now()
 }
 
+const SIGNED_OUT: SessionState = { session: null, expired: false, returnTo: null }
+
+function currentPlace() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('auth')
+  url.searchParams.delete('redirect')
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
 function readStorage(): SessionState {
   try {
     const raw = localStorage.getItem(SESSION_KEY)
-    if (!raw) return { session: null, expired: false }
+    if (!raw) return SIGNED_OUT
     const session = JSON.parse(raw) as Session
-    return isExpired(session) ? { session: null, expired: true } : { session, expired: false }
+    return isExpired(session)
+      ? { session: null, expired: true, returnTo: currentPlace() }
+      : { session, expired: false, returnTo: null }
   } catch {
-    return { session: null, expired: false }
+    return SIGNED_OUT
   }
 }
 
@@ -73,17 +86,21 @@ export const sessionStore = {
     }
   },
   start(session: Session) {
-    setState({ session, expired: false })
+    setState({ session, expired: false, returnTo: null })
   },
   updateUser(user: User) {
     if (state.session) setState({ ...state, session: { ...state.session, user } })
   },
   end(reason: SessionEndReason) {
-    if (!state.session && reason === 'logout') return
-    setState({ session: null, expired: reason === 'expired' })
+    if (reason === 'logout') {
+      if (state.session) setState(SIGNED_OUT)
+      return
+    }
+    // Several requests can fail with the same expiry; keep the first place it was noticed.
+    setState({ session: null, expired: true, returnTo: state.expired ? state.returnTo : currentPlace() })
   },
   dismissExpired() {
-    if (state.expired) setState({ ...state, expired: false }, false)
+    if (state.expired) setState({ ...state, expired: false, returnTo: null }, false)
   },
   token: () => state.session?.token ?? null,
   /** Stable anonymous id that scopes the visitor cart on the server. */

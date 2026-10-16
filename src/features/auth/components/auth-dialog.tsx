@@ -64,7 +64,7 @@ export function AuthDialog() {
   const search = useSearch({ strict: false }) as { auth?: AuthView; redirect?: string }
   const navigate = useNavigate()
   const router = useRouter()
-  const { expired } = useSessionState()
+  const { expired, returnTo } = useSessionState()
 
   const open = search.auth !== undefined || expired
   const view: AuthView = search.auth ?? 'login'
@@ -90,8 +90,10 @@ export function AuthDialog() {
       resetScroll: false,
     })
 
+  // The expiry redirect may not have reached the URL yet when the user signs in again.
   const onAuthenticated = () => {
-    if (search.redirect) void router.navigate({ href: search.redirect, replace: true })
+    const target = search.redirect ?? returnTo
+    if (target) void router.navigate({ href: target, replace: true })
     else void clearSearch()
   }
 
@@ -310,13 +312,13 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
     register.mutate(input, {
       onSuccess,
       onError: (error) => {
-        const fieldErrors = toApiError(error).fieldErrors
-        if (fieldErrors) form.setErrors(fieldErrors as FieldErrors<RegisterValues>)
+        const { fieldErrors } = toApiError(error)
+        if (Object.keys(fieldErrors).length > 0) form.setErrors(fieldErrors as FieldErrors<RegisterValues>)
       },
     })
   }
 
-  const serverError = register.isError && !toApiError(register.error).fieldErrors
+  const serverError = register.isError && Object.keys(toApiError(register.error).fieldErrors).length === 0
 
   return (
     <form noValidate onSubmit={submit} className="mt-10 flex flex-col md:mt-0 md:px-20 md:pt-6">

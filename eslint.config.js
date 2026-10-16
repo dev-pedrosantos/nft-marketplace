@@ -51,5 +51,9 @@ export default defineConfig([
     languageOptions: {
       globals: globals.node,
     },
+    rules: {
+      // Playwright fixtures receive a `use` callback that is not a React hook.
+      'react-hooks/rules-of-hooks': 'off',
+    },
   },
 ])

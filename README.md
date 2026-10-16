@@ -1,10 +1,28 @@
-# NFT Marketplace — Frontend Challenge
+# Kurio — NFT Marketplace (Frontend Challenge)
 
-Aplicação React + TypeScript baseada no design do desafio no Figma
+Marketplace de NFTs em React + TypeScript construído a partir do design do desafio no Figma
 ([Frontend Challenge](https://www.figma.com/design/Ff0SksUi7UFtPWUO8kyNtw/Frontend-Challenge)).
+Não há backend real: a API REST e o Socket.IO são simulados no navegador pelo MSW, com estado
+persistido no `localStorage`. **Não existe blockchain nem pagamento real**: a compra é simulada e o
+resultado depende apenas da resposta da API mockada.
 
-> **Status:** apenas a infraestrutura está configurada. As telas do marketplace ainda
-> não foram implementadas; a rota `/` renderiza um placeholder vazio.
+A arquitetura (camadas, cache, sessão, checkout idempotente, tempo real e mocks) está descrita em
+[`docs/architecture.md`](docs/architecture.md).
+
+## Telas e funcionalidades
+
+| Rota | Tela | Destaques |
+| --- | --- | --- |
+| `/` | Home e catálogo | Busca, abas, filtros (coleção, rede, faixa de preço), ordenação e paginação, todos refletidos na URL |
+| `/nfts/:nftId` | Detalhes | Galeria, edição (1/1, 1/10, 1/50, aberta), quantidade limitada ao estoque, favoritos, compra e preço/estoque em tempo real |
+| `/carrinho` | Carrinho | Persistência no servidor (visitante e usuário), cupons, totais calculados pela API, avisos de preço/estoque alterados |
+| `/checkout` | Pagamento | Dados do colecionador, carteira principal/secundária, rede, provedor (WalletConnect, MetaMask, Coinbase), revisão de valores e envio idempotente |
+| `/pedidos/:orderId` | Pedido e confirmação | Pendente, recusado ou confirmado; o recibo de confirmação só abre quando o pagamento é confirmado |
+| `/conta/perfil` · `/conta/carteiras` · `/conta/favoritos` · `/conta/pedidos` | Conta | Perfil com avatar, senha, carteiras, favoritos e histórico de pedidos |
+| `?auth=login` · `?auth=signup` | Login e cadastro | Diálogo sobre qualquer tela, validação, sessão persistida, logout e sessão expirada |
+
+`/checkout`, `/pedidos/*` e `/conta/*` são rotas privadas: sem sessão, o usuário vai para o login
+e volta à página pedida depois de entrar.
 
 ## Stack
 
@@ -18,32 +36,36 @@ Aplicação React + TypeScript baseada no design do desafio no Figma
 | HTTP (REST) | Axios | 1.20 |
 | Tempo real | Socket.IO Client | 4.8 |
 | Estilos | Tailwind CSS (plugin Vite) | 4 |
-| Componentes | shadcn/ui (estilo `radix-nova`) | CLI 4 |
+| Componentes | shadcn/ui + Radix | CLI 4 |
 | Mock de API | MSW + `@mswjs/socket.io-binding` | 2.15 / 0.2 |
 | Testes E2E | Playwright | 1.64 |
 
-> O MSW está fixado na linha 2.x porque o `@mswjs/socket.io-binding` (simulação do Socket.IO)
-> só é compatível com `msw@^2.10.2`.
+> O MSW está fixado na linha 2.x porque o `@mswjs/socket.io-binding` só é compatível com
+> `msw@^2.10.2`.
 
 ## Requisitos
 
 - Node.js **22.12+** (testado com Node 24)
 - npm 10+
 
-## Instalação
+## Instalação e execução
 
 ```bash
 npm install
-cp .env.example .env.local   # opcional: só se quiser sobrescrever os valores padrão
-```
-
-## Execução
-
-```bash
-npm run dev       # servidor de desenvolvimento em http://localhost:5173
+npm run dev       # http://localhost:5173, com os mocks ativos
 npm run build     # typecheck + build de produção em dist/
-npm run preview   # serve o build de produção localmente
+npm run preview   # serve o build de produção
 ```
+
+### Contas de demonstração
+
+| E-mail | Senha | Observação |
+| --- | --- | --- |
+| `colecionador@kurio.com` | `kurio123` | Nova Sato: carrinho com 3 itens (total 26.846 ETH), duas carteiras |
+| `ana@kurio.com` | `kurio123` | Outra conta, usada para verificar o isolamento de dados |
+
+Também é possível criar uma conta pelo cadastro. Cupons disponíveis: `KURIO10` (10%),
+`LANCAMENTO` (0,5 ETH acima de 5 ETH) e `EXPIRADO` (sempre recusado).
 
 ## Variáveis de ambiente
 
@@ -53,15 +75,14 @@ npm run preview   # serve o build de produção localmente
 | `VITE_SOCKET_URL` | origem da aplicação | URL do servidor Socket.IO. |
 | `VITE_ENABLE_MOCKS` | `false` | `true` inicia o MSW antes de renderizar a aplicação. |
 
-O arquivo `.env.development` (versionado) já ativa os mocks em `npm run dev`.
-Para sobrescrever localmente, crie `.env.development.local` (ignorado pelo git).
+O `.env.development` (versionado) ativa os mocks em `npm run dev` e define
+`VITE_SOCKET_URL=http://localhost:3001`. Para sobrescrever localmente, crie
+`.env.development.local` (ignorado pelo git).
 
-## Mocks da API (MSW)
+## API simulada (MSW)
 
-### Como ativar / desativar
-
-- **Ativar:** `VITE_ENABLE_MOCKS=true` (padrão em desenvolvimento via `.env.development`).
-- **Desativar** (para usar uma API real):
+- **Ativar:** `VITE_ENABLE_MOCKS=true` (padrão em desenvolvimento).
+- **Desativar** para usar uma API real:
 
   ```bash
   # .env.development.local
@@ -70,60 +91,52 @@ Para sobrescrever localmente, crie `.env.development.local` (ignorado pelo git).
   VITE_SOCKET_URL=https://seu-socket.exemplo.com
   ```
 
-- **Build de produção com mocks** (ex.: deploy de demonstração sem backend):
+- **Build de demonstração com mocks:** `VITE_ENABLE_MOCKS=true npm run build`.
 
-  ```bash
-  VITE_ENABLE_MOCKS=true npm run build
-  ```
+O "banco" simulado fica em `localStorage['kurio.mock-db']` e sobrevive a recarregamentos. Para
+voltar aos dados iniciais, rode `__kurioMock.reset()` no console ou limpe o `localStorage`.
 
-Com os mocks ativos, o console do navegador exibe `[MSW] Mocking enabled.` e o
-service worker `mockServiceWorker.js` passa a controlar a página.
+### Endpoints
 
-### Onde ficam
+| Domínio | Endpoints |
+| --- | --- |
+| Autenticação | `POST /auth/login`, `POST /auth/register`, `POST /auth/logout`, `GET /auth/me` |
+| Catálogo | `GET /nfts?tab&sort&page&search&collection&network&minPrice&maxPrice`, `GET /nfts/featured`, `GET /nfts/:id`, `GET /nfts/:id/related`, `GET /catalog/filters` |
+| Carrinho | `GET /cart?network`, `GET /cart/summary`, `POST /cart/items`, `PATCH /cart/items/:lineId`, `DELETE /cart/items/:lineId`, `POST /cart/items/:lineId/accept-price`, `POST /cart/coupon`, `DELETE /cart/coupon` |
+| Checkout e pedidos | `POST /checkout/quote`, `POST /orders` (exige `Idempotency-Key`), `GET /orders`, `GET /orders/:id` |
+| Conta | `PUT /me/profile`, `PUT /me/password`, `PUT /me/avatar`, `DELETE /me/avatar`, `GET/POST /me/wallets`, `PUT/DELETE /me/wallets/:id`, `GET /me/favorites`, `PUT/DELETE /me/favorites/:nftId` |
+| Conteúdo | `GET /promotions`, `GET /posts`, `POST /newsletter/subscriptions` |
 
-```
-src/mocks/
-├── browser.ts          # setupWorker + startMockWorker()
-├── data/               # fixtures (respostas simuladas)
-└── handlers/
-    ├── index.ts        # agrega todos os handlers
-    ├── http.ts         # handlers REST (http.get/post/...)
-    └── socket.ts       # servidor Socket.IO simulado (ws.link + toSocketIo)
-```
+Rotas autenticadas usam `Authorization: Bearer <token>`. O carrinho de visitante é identificado
+por `X-Guest-Id` e é mesclado ao carrinho da conta no login.
 
-- Dados simulados ficam **somente** em `src/mocks/data`; nunca dentro de componentes.
-- Requisições para `VITE_API_URL` sem handler geram um aviso no console.
-- O worker (`public/mockServiceWorker.js`) é gerado pelo MSW. Após atualizar o `msw`,
-  regenere com `npx msw init public`.
+### Eventos Socket.IO
 
-### Endpoints simulados
-
-| Método | Rota (relativa a `VITE_API_URL`) | Usado em |
+| Evento | Direção | Conteúdo |
 | --- | --- | --- |
-| GET | `/nfts?tab&page&collection&network&minPrice&maxPrice&search` | Grade de NFTs da Home |
-| GET | `/nfts/featured` | Banner "NFT em destaque" |
-| GET | `/catalog/filters` | Filtros (coleções, faixa de preço, redes) |
-| GET | `/promotions` | Cards promocionais |
-| GET | `/posts?limit` | Diário da Cunhagem (blog) |
-| GET | `/cart/summary` | Contador do carrinho no header |
-| POST | `/newsletter/subscriptions` | Formulário de newsletter |
+| `nft.updated` | servidor → cliente | Preço e estoque por edição, com `version` para descartar eventos fora de ordem |
+| `order.updated` | servidor → cliente | Mudança de status de um pedido; só chega ao dono da sessão |
+| `session.identify` | cliente → servidor | Associa a conexão ao token da sessão |
 
-No mock de `/nfts`, apenas `page` e `search` alteram o resultado: o Figma não define quais
-NFTs pertencem a cada aba, coleção, rede ou faixa de preço. Os demais parâmetros são
-enviados e ficam na URL, prontos para uma API real.
+### Cenários de falha
 
-### Socket.IO simulado
+Ative pelo console (`__kurioMock.enable('<cenário>')`) ou gravando uma lista separada por
+vírgulas em `localStorage['kurio.mock.scenarios']` antes de carregar a página.
 
-- O cliente (`src/lib/realtime/socket.ts`) usa **apenas o transporte `websocket`**, porque o MSW
-  não intercepta o long-polling HTTP do Socket.IO.
-- O handler responde ao handshake do Engine.IO/Socket.IO e envia pings periódicos para manter a
-  conexão estável. Nenhum evento de negócio está simulado ainda: os eventos serão adicionados
-  em `src/mocks/handlers/socket.ts` e tipados em `src/lib/realtime/events.ts` quando o contrato
-  de tempo real for definido.
-- Em desenvolvimento, `VITE_SOCKET_URL` precisa ter **origem diferente** do servidor Vite
-  (padrão `http://localhost:3001`). O MSW intercepta a conexão antes de ela chegar à rede, então
-  nenhum servidor precisa estar rodando nesse endereço. Usar a mesma origem do Vite faria o mock
-  capturar também o WebSocket de HMR do Vite.
+| Cenário | Efeito |
+| --- | --- |
+| `payment-failure` | Os pagamentos são recusados |
+| `payment-timeout` | O pagamento fica pendente por 45 s antes de confirmar |
+| `price-change` | A próxima revisão de valores aumenta o preço do primeiro item (uso único) |
+| `out-of-stock` | A próxima revisão esgota o primeiro item (uso único) |
+| `slow-order` | A próxima criação de pedido responde depois do timeout do cliente; o pedido é criado mesmo assim (uso único) |
+| `server-error` | A próxima criação de pedido falha com 503 (uso único) |
+| `live-market` | Publica mudanças aleatórias de preço e estoque a cada poucos segundos |
+| `no-latency` | Remove a latência artificial de 250 ms |
+
+Outros utilitários do console: `__kurioMock.active()`, `disable(cenário)`, `reset()`,
+`expireSessions()`, `setPrice(nftId, '1.50')`, `setAvailability(nftId, '1-10', 0)` e
+`realtimeClients()`.
 
 ## Testes
 
@@ -131,19 +144,45 @@ enviados e ficam na URL, prontos para uma API real.
 npm run test:e2e:install   # baixa o Chromium do Playwright (uma vez)
 npm run test:e2e           # roda os testes E2E (desktop + mobile)
 npm run test:e2e:ui        # modo interativo
-npm run test:e2e:headed    # com o navegador visível
 npm run test:e2e:report    # abre o último relatório HTML
 ```
 
-- Os testes ficam em `tests/e2e`. O Playwright sobe o `npm run dev` automaticamente (ou reutiliza
-  um servidor já aberto na porta 5173), com os mocks ativos.
-- Projetos configurados: `desktop` (Desktop Chrome) e `mobile` (Pixel 7), ambos com Chromium.
-- **Linux / WSL:** o Chromium precisa de bibliotecas do sistema. Se aparecer
-  `error while loading shared libraries: libnspr4.so`, instale-as uma vez:
+Os specs ficam em `tests/e2e` e rodam nos projetos `desktop` (Desktop Chrome) e `mobile`
+(Pixel 7). O Playwright sobe o `npm run dev` ou reutiliza um servidor já aberto na porta 5173.
+Cada teste usa um contexto novo do navegador, então o banco simulado começa sempre dos dados
+iniciais, com o cenário `no-latency` ligado.
 
-  ```bash
-  sudo npx playwright install-deps chromium
-  ```
+| Spec | Cobertura |
+| --- | --- |
+| `catalog.spec.ts` | Busca, estado vazio, ordenação por preço, paginação e abas na URL |
+| `details.spec.ts` | Edição, limite de quantidade pelo estoque, compra, edição esgotada, favoritos com login, preço e estoque via socket |
+| `auth.spec.ts` | Validação, credenciais inválidas, sessão após reload, logout, rota privada, sessão expirada, cadastro e isolamento entre usuários |
+| `cart.spec.ts` | Totais, cupons válidos/inválidos/expirados, quantidade, remoção, persistência e carrinho de visitante até o checkout |
+| `checkout.spec.ts` | Compra com clique duplo sem pedido duplicado, pagamento recusado, mudança de preço, timeout com recuperação idempotente e erro 503 com nova tentativa |
+| `accessibility.spec.ts` | Foco preso no diálogo, Escape, foco visível e `prefers-reduced-motion` |
+| `smoke.spec.ts` | Montagem da aplicação, service worker do MSW e conexão Socket.IO |
+
+Os cenários de falha do checkout rodam só no projeto `desktop`, porque o fluxo de API é o mesmo
+nas duas larguras; o fluxo feliz do checkout roda nas duas.
+
+**Linux / WSL:** o Chromium precisa de bibliotecas do sistema. Se aparecer
+`error while loading shared libraries: libnspr4.so`, instale-as:
+
+```bash
+sudo npx playwright install-deps chromium
+```
+
+Sem `sudo`, dá para extrair os pacotes localmente e apontar o `LD_LIBRARY_PATH` para eles
+(a pasta `.playwright-libs` já está no `.gitignore`):
+
+```bash
+mkdir -p .playwright-libs/debs && cd .playwright-libs/debs
+apt-get download libnspr4 libnss3 libasound2t64
+for deb in *.deb; do dpkg -x "$deb" ..; done
+cd ../..
+export LD_LIBRARY_PATH=$PWD/.playwright-libs/usr/lib/x86_64-linux-gnu
+npm run test:e2e
+```
 
 ### Verificações de qualidade
 
@@ -157,50 +196,25 @@ npm run check       # typecheck + lint + testes E2E
 
 ```
 src/
-├── app/                 # composição da aplicação: QueryClient, router, devtools
-├── components/ui/       # componentes shadcn/ui (gerados pelo CLI)
-├── config/env.ts        # leitura tipada das variáveis de ambiente
-├── features/            # módulos por funcionalidade (ver convenção abaixo)
-├── lib/
-│   ├── api/             # cliente Axios e normalização de erros (ApiError)
-│   ├── realtime/        # cliente Socket.IO, contrato de eventos e hook de conexão
-│   └── utils.ts         # utilitário `cn` (shadcn)
-├── mocks/               # MSW: handlers REST/Socket.IO e fixtures
-├── pages/               # componentes de página, compostos a partir das features
-├── routes/              # rotas do TanStack Router (arquivos finos que apontam para pages)
-├── types/               # tipos compartilhados entre features
-├── routeTree.gen.ts     # gerado automaticamente pelo TanStack Router (não editar)
-├── App.tsx              # providers (QueryClient + Router)
-└── main.tsx             # entrada: ativa o MSW (se habilitado) e renderiza
-tests/
-└── e2e/                 # testes Playwright
+├── app/            # QueryClient, router, sincronização de sessão e de tempo real
+├── assets/         # imagens e ícones exportados do Figma
+├── components/     # layout (header, page shell, tab bar) e UI compartilhada (diálogo, formulários, estados)
+├── config/env.ts   # leitura tipada das variáveis de ambiente
+├── features/       # domínios: auth, cart, orders, nfts, wallets, favorites, profile, account...
+├── lib/            # cliente HTTP e erros, Socket.IO, dinheiro em decimal, formatação, validação, formulários
+├── mocks/          # MSW: handlers REST, Socket.IO, banco persistido, cenários e utilitários de console
+├── pages/          # telas compostas a partir das features
+├── routes/         # rotas do TanStack Router (arquivos finos que apontam para pages)
+└── main.tsx        # entrada: inicia o MSW e só então carrega a aplicação
+tests/e2e/          # specs Playwright e helpers (support.ts)
+docs/               # documentação de arquitetura
 ```
 
-### Convenção para funcionalidades
+## Diferenças conscientes em relação ao Figma
 
-Cada funcionalidade identificada no design ganha uma pasta em `src/features/<nome>/`:
-
-```
-src/features/<nome>/
-├── api/          # funções de acesso à API (usam apiClient) e query options do TanStack Query
-├── components/   # componentes específicos da funcionalidade
-├── hooks/        # hooks específicos
-└── types.ts      # tipos do domínio
-```
-
-Os handlers MSW correspondentes ficam em `src/mocks/handlers/` e as fixtures em `src/mocks/data/`.
-
-### Adicionando componentes shadcn/ui
-
-```bash
-npx shadcn@latest add <componente>
-```
-
-Os componentes são gerados em `src/components/ui`. O tema (cores, raio, fontes) em
-`src/index.css` ainda é o padrão do shadcn e será substituído pelos tokens do Figma.
-
-## Roteamento
-
-As rotas são definidas por arquivo em `src/routes`. O plugin do Vite regenera
-`src/routeTree.gen.ts` automaticamente durante `dev` e `build`. O contexto do router expõe o
-`queryClient` para uso em `loader`s (`context.queryClient.ensureQueryData(...)`).
+- O visitante começa com o carrinho vazio, então o contador "6" do header do Figma só aparece com itens.
+- O checkout vem preenchido com a carteira principal (o Figma mostra os campos vazios) e o provedor
+  de pagamento começa sem seleção (o Figma mostra Coinbase marcado), para que a escolha seja explícita.
+- No checkout, o nome ENS tem um campo de texto além do seletor `.eth` do Figma, porque a validação exige o nome.
+- O carrinho mobile tem um botão de remover item, que não existe no Figma, mas é necessário para a funcionalidade.
+- "Ver no Etherscan" no recibo apenas avisa que a transação é simulada.

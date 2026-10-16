@@ -11,7 +11,7 @@ import { useSessionState } from '@/features/auth/session-store'
 export function SessionSync() {
   const queryClient = useQueryClient()
   const router = useRouter()
-  const { session, expired } = useSessionState()
+  const { session, expired, returnTo } = useSessionState()
   const userId = session?.user.id ?? null
   const previousUserId = useRef(userId)
 
@@ -35,7 +35,7 @@ export function SessionSync() {
       if (isPrivate) {
         void router.navigate({
           to: '/',
-          search: expired ? { auth: 'login', redirect: router.state.location.href } : {},
+          search: expired ? { auth: 'login', redirect: returnTo ?? router.state.location.href } : {},
           replace: true,
         })
       }
@@ -43,7 +43,7 @@ export function SessionSync() {
       // Route guards and loaders depend on the session.
       void router.invalidate()
     }
-  }, [expired, queryClient, router, userId])
+  }, [expired, queryClient, returnTo, router, userId])
 
   return null
 }

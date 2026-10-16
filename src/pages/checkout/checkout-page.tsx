@@ -156,6 +156,28 @@ function CheckoutContent({ user, wallets }: { user: User; wallets: Wallet[] }) {
       />
     )
   }
+  if (cart.data.items.length === 0 && checkout.hasUnresolvedAttempt) {
+    return (
+      <EmptyState
+        title="Sua compra anterior ainda não foi confirmada"
+        description="A última tentativa de pagamento não recebeu resposta. Verifique o resultado antes de comprar de novo: nenhuma cobrança será repetida."
+        action={
+          <div className="flex flex-col items-center gap-3">
+            {checkout.error && <FormMessage tone="error">{checkout.error.message}</FormMessage>}
+            <button
+              type="button"
+              onClick={() => void checkout.resume()}
+              disabled={checkout.submitting}
+              aria-busy={checkout.submitting}
+              className="h-10 rounded-[3px] bg-primary px-6 text-[15px] leading-4 font-bold text-ink disabled:opacity-60"
+            >
+              {checkout.submitting ? 'Verificando…' : 'Verificar compra'}
+            </button>
+          </div>
+        }
+      />
+    )
+  }
   if (cart.data.items.length === 0) {
     return (
       <EmptyState
@@ -590,7 +612,7 @@ function MobileCheckout({
                   {option.id === 'coinbase' ? (
                     <img src={walletIcon} alt="" className="relative size-6 p-[2px]" />
                   ) : (
-                    <span className="relative text-sm font-bold text-highlight">
+                    <span aria-hidden className="relative text-sm font-bold text-highlight">
                       {option.id === 'walletconnect' ? 'W' : 'M'}
                     </span>
                   )}
