@@ -158,18 +158,21 @@ function OrderLines({ order, compact = false }: { order: Order; compact?: boolea
       <img src={dividerPrimary} alt="" className="block h-px w-full max-w-none opacity-40" />
       <ul aria-label="Itens do pedido" className="flex flex-col gap-3">
         {order.items.map((line) => (
-          <li key={`${line.nftId}-${line.editionId}`} className="flex h-[70px] items-center justify-between gap-3">
+          <li
+            key={`${line.nftId}-${line.editionId}`}
+            className="flex min-h-[70px] items-center justify-between gap-3 md:h-[70px]"
+          >
             <div className="flex min-w-0 items-center gap-3">
-              <img src={line.imageUrl} alt="" className="size-[70px] shrink-0 rounded-[8px] object-cover" />
+              <img src={line.imageUrl} alt="" className="size-14 shrink-0 rounded-[8px] object-cover md:size-[70px]" />
               <div className="flex min-w-0 flex-col gap-1.5 leading-4">
-                <p className="truncate text-base font-bold">{line.name}</p>
-                <p className="truncate text-sm text-subtle">
+                <p className="text-base font-bold break-words md:truncate">{line.name}</p>
+                <p className="text-sm text-subtle md:truncate">
                   ID do token: {line.tokenId}
                   {!compact && ` • ${line.editionLabel}`}
                 </p>
               </div>
             </div>
-            <p className="flex shrink-0 items-center gap-6 leading-4 whitespace-nowrap md:gap-12">
+            <p className="flex shrink-0 flex-col items-end gap-1.5 leading-4 whitespace-nowrap md:flex-row md:items-center md:gap-12">
               <span className="text-sm text-muted-foreground">
                 <span className="sr-only">Quantidade: </span>(x {line.quantity})
               </span>
@@ -204,7 +207,7 @@ function ConfirmationDialog({ order }: { order: Order }) {
         <header className="flex h-[156px] flex-col items-center justify-center gap-4">
           <IconFrame src={thankYou} className="size-20" inner="inset-[0_9.27%]" />
           <DialogTitle className="sr-only">Compra confirmada</DialogTitle>
-          <DialogDescription className="text-base leading-4 font-bold text-muted-foreground">
+          <DialogDescription className="px-6 text-center text-base leading-4 font-bold text-muted-foreground">
             Seus NFTs agora estão na sua carteira
           </DialogDescription>
         </header>
@@ -213,15 +216,15 @@ function ConfirmationDialog({ order }: { order: Order }) {
           <ReceiptMeta label="ID da transação" bold className="md:min-w-[127px]">
             {order.transactionHash ? shortenHash(order.transactionHash) : '—'}
           </ReceiptMeta>
-          <img src={dividerVertical} alt="" className="hidden h-px w-[31px] rotate-90 md:block" />
+          <ReceiptDivider />
           <ReceiptMeta label="Data" className="md:min-w-[109px]">
             {formatReceiptDate(order.updatedAt)}
           </ReceiptMeta>
-          <img src={dividerVertical} alt="" className="hidden h-px w-[31px] rotate-90 md:block" />
+          <ReceiptDivider />
           <ReceiptMeta label="Total" className="md:min-w-[91px]">
             {formatEth(order.totalEth)}
           </ReceiptMeta>
-          <img src={dividerVertical} alt="" className="hidden h-px w-[31px] rotate-90 md:block" />
+          <ReceiptDivider />
           <ReceiptMeta label="Carteira" bold className="md:min-w-[73px]">
             {order.walletLabel}
           </ReceiptMeta>
@@ -263,6 +266,15 @@ function ConfirmationDialog({ order }: { order: Order }) {
         <div className="h-2.5 bg-primary" />
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** The divider asset is horizontal; a rotated image keeps its 31px layout width, so it is wrapped. */
+function ReceiptDivider() {
+  return (
+    <span className="mx-1.5 hidden w-px justify-center md:flex">
+      <img src={dividerVertical} alt="" className="h-px w-[31px] max-w-none shrink-0 rotate-90" />
+    </span>
   )
 }
 

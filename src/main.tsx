@@ -1,10 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import { env } from './config/env'
 
 async function enableMocking() {
-  if (!env.enableMocks) return
+  // Read the flag inline (not through `env`) so builds without mocks drop the MSW chunk entirely.
+  if (import.meta.env.VITE_ENABLE_MOCKS !== 'true') return
   const { startMockWorker } = await import('./mocks/browser')
   await startMockWorker()
 }

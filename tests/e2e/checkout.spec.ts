@@ -41,8 +41,7 @@ test.describe('checkout', () => {
     await expect(page.getByText('Seu carrinho está vazio')).toBeVisible()
   })
 
-  test('pagamento recusado não mostra confirmação e mantém o carrinho', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'Fluxo de API idêntico ao desktop; o layout mobile é coberto no teste feliz.')
+  test('pagamento recusado não mostra confirmação e mantém o carrinho', async ({ page }) => {
     await openCheckout(page)
     await enableScenario(page, 'payment-failure')
 
@@ -57,8 +56,7 @@ test.describe('checkout', () => {
     await expect(page.getByRole('list', { name: 'Itens do carrinho' }).filter({ visible: true }).getByRole('listitem')).toHaveCount(3)
   })
 
-  test('mudança de preço pede revisão antes de cobrar', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'Fluxo de API idêntico ao desktop.')
+  test('mudança de preço pede revisão antes de cobrar', async ({ page }) => {
     await openCheckout(page)
     await enableScenario(page, 'price-change')
 
@@ -75,8 +73,7 @@ test.describe('checkout', () => {
     expect(await orderCount(page)).toBe(1)
   })
 
-  test('timeout permite tentar de novo com a mesma chave de idempotência', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'Fluxo de API idêntico ao desktop.')
+  test('timeout permite tentar de novo com a mesma chave de idempotência', async ({ page }) => {
     test.setTimeout(60_000)
     await openCheckout(page)
     await enableScenario(page, 'slow-order')
@@ -101,8 +98,7 @@ test.describe('checkout', () => {
     expect(await orderCount(page)).toBe(1)
   })
 
-  test('falha temporária do serviço mostra erro com nova tentativa', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'Fluxo de API idêntico ao desktop.')
+  test('falha temporária do serviço mostra erro com nova tentativa', async ({ page }) => {
     await openCheckout(page)
     await enableScenario(page, 'server-error')
 

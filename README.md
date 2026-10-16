@@ -138,6 +138,18 @@ Outros utilitários do console: `__kurioMock.active()`, `disable(cenário)`, `re
 `expireSessions()`, `setPrice(nftId, '1.50')`, `setAvailability(nftId, '1-10', 0)` e
 `realtimeClients()`.
 
+## Build de produção e deploy
+
+Não há deploy público configurado neste repositório.
+
+- `npm run build` gera um build **sem mocks**: o MSW fica fora do bundle e o app espera uma API real
+  em `VITE_API_URL`.
+- Para uma demonstração sem backend, gere o build com `VITE_ENABLE_MOCKS=true npm run build`. O
+  service worker (`mockServiceWorker.js`, copiado de `public/`) precisa ser servido na raiz do site.
+- As rotas são do lado do cliente: o host precisa responder `index.html` para qualquer caminho
+  desconhecido (fallback de SPA). Sem isso, recarregar `/carrinho` ou `/nfts/:id` retorna 404.
+  O `npm run preview` já faz esse fallback e serve para conferir o build localmente.
+
 ## Testes
 
 ```bash
@@ -159,11 +171,12 @@ iniciais, com o cenário `no-latency` ligado.
 | `auth.spec.ts` | Validação, credenciais inválidas, sessão após reload, logout, rota privada, sessão expirada, cadastro e isolamento entre usuários |
 | `cart.spec.ts` | Totais, cupons válidos/inválidos/expirados, quantidade, remoção, persistência e carrinho de visitante até o checkout |
 | `checkout.spec.ts` | Compra com clique duplo sem pedido duplicado, pagamento recusado, mudança de preço, timeout com recuperação idempotente e erro 503 com nova tentativa |
+| `orders-realtime.spec.ts` | `order.updated` recebido pelo socket do dono, evento de outro usuário não entregue à sessão atual, banner de pagamento pendente após sair da página e recarregar |
 | `accessibility.spec.ts` | Foco preso no diálogo, Escape, foco visível e `prefers-reduced-motion` |
 | `smoke.spec.ts` | Montagem da aplicação, service worker do MSW e conexão Socket.IO |
 
-Os cenários de falha do checkout rodam só no projeto `desktop`, porque o fluxo de API é o mesmo
-nas duas larguras; o fluxo feliz do checkout roda nas duas.
+Dois testes rodam só no `desktop`: a ordenação do catálogo (o seletor não existe no layout mobile do
+Figma) e o foco visível por Tab (cenário de teclado físico). Todo o resto roda nos dois projetos.
 
 **Linux / WSL:** o Chromium precisa de bibliotecas do sistema. Se aparecer
 `error while loading shared libraries: libnspr4.so`, instale-as:
@@ -216,5 +229,10 @@ docs/               # documentação de arquitetura
 - O checkout vem preenchido com a carteira principal (o Figma mostra os campos vazios) e o provedor
   de pagamento começa sem seleção (o Figma mostra Coinbase marcado), para que a escolha seja explícita.
 - No checkout, o nome ENS tem um campo de texto além do seletor `.eth` do Figma, porque a validação exige o nome.
-- O carrinho mobile tem um botão de remover item, que não existe no Figma, mas é necessário para a funcionalidade.
+- No carrinho mobile, o Figma mostra a lixeira em um único item, sobreposta ao botão "+"; no app ela
+  fica no canto de cada item, sem cobrir o controle de quantidade.
+- Os frames de Perfil e Carteiras do Figma terminam sem rodapé; no app essas telas usam o mesmo
+  rodapé das demais páginas.
+- O Figma não tem frame mobile da confirmação; em telas estreitas o recibo empilha quantidade e
+  subtotal e deixa os nomes quebrarem linha.
 - "Ver no Etherscan" no recibo apenas avisa que a transação é simulada.

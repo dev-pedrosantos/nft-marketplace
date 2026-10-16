@@ -126,6 +126,8 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
   emite `order.updated`.
 - **`src/mocks/scenarios.ts`** e **`src/mocks/devtools.ts`:** cenários de falha e o objeto
   `window.__kurioMock`, usados manualmente e pelos testes E2E.
+- O `main.tsx` testa `import.meta.env.VITE_ENABLE_MOCKS` diretamente, para que um build sem mocks
+  descarte todo o código do MSW.
 
 ## Acessibilidade e responsividade
 

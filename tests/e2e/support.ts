@@ -33,10 +33,12 @@ export const test = base.extend<{ scenarios: MockScenario[] }>({
 export { expect }
 
 export async function enableScenario(page: Page, scenario: MockScenario) {
+  await waitForMocks(page)
   await page.evaluate((name) => window.__kurioMock!.enable(name), scenario)
 }
 
 export async function disableScenario(page: Page, scenario: MockScenario) {
+  await waitForMocks(page)
   await page.evaluate((name) => window.__kurioMock!.disable(name), scenario)
 }
 

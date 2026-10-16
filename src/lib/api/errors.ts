@@ -36,6 +36,7 @@ export class ApiError extends Error {
 
 const NETWORK_MESSAGE = 'Não foi possível falar com o servidor. Verifique sua conexão e tente novamente.'
 const TIMEOUT_MESSAGE = 'O servidor demorou demais para responder. Tente novamente.'
+const UNEXPECTED_RESPONSE_MESSAGE = 'O servidor não conseguiu atender ao pedido. Tente novamente.'
 
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error
@@ -48,8 +49,10 @@ export function toApiError(error: unknown): ApiError {
         isNetworkError: true,
       })
     }
-    const body = (error.response.data ?? {}) as ApiErrorBody
-    return new ApiError(body.message ?? error.message, {
+    // Responses that are not the API's JSON error (e.g. an HTML 404 page) carry no message.
+    const data: unknown = error.response.data
+    const body = (data && typeof data === 'object' ? data : {}) as ApiErrorBody
+    return new ApiError(body.message ?? UNEXPECTED_RESPONSE_MESSAGE, {
       status: error.response.status,
       code: body.code ?? null,
       fieldErrors: body.fieldErrors,
