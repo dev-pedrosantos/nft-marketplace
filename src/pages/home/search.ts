@@ -1,7 +1,8 @@
-import { NFT_TABS, type NftTab } from '@/features/nfts/types'
+import { NFT_SORTS, NFT_TABS, type NftSort, type NftTab } from '@/features/nfts/types'
 
 export interface HomeSearch {
   tab?: NftTab
+  sort?: NftSort
   page?: number
   collection?: string
   network?: string
@@ -22,6 +23,7 @@ export function parseHomeSearch(search: Record<string, unknown>): HomeSearch {
   const page = asNumber(search.page)
   return {
     tab: NFT_TABS.includes(search.tab as NftTab) ? (search.tab as NftTab) : undefined,
+    sort: NFT_SORTS.includes(search.sort as NftSort) ? (search.sort as NftSort) : undefined,
     page: page !== undefined && page >= 1 ? Math.floor(page) : undefined,
     collection: asString(search.collection),
     network: asString(search.network),

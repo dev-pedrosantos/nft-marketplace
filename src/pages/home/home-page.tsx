@@ -42,6 +42,7 @@ export function HomePage() {
   const listParams: NftListParams = {
     tab: search.tab ?? 'all',
     page: search.page ?? 1,
+    sort: search.sort,
     collection,
     network: search.network,
     minPrice: search.minPrice,
@@ -110,7 +111,11 @@ export function HomePage() {
                   value={listParams.tab}
                   onChange={(tab) => updateSearch({ tab: tab === 'all' ? undefined : tab })}
                 />
-                <SortLabel label="Listados recentemente" className="max-md:hidden" />
+                <SortLabel
+                  value={listParams.sort ?? 'recent'}
+                  onChange={(sort) => updateSearch({ sort: sort === 'recent' ? undefined : sort })}
+                  className="max-md:hidden"
+                />
               </div>
 
               <CatalogResults query={nftsQuery} />

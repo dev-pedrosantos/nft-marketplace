@@ -10,33 +10,160 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as CarrinhoRouteImport } from './routes/carrinho'
+import { Route as AuthenticatedCheckoutRouteImport } from './routes/_authenticated/checkout'
+import { Route as NftsNftIdRouteImport } from './routes/nfts.$nftId'
+import { Route as AuthenticatedContaIndexRouteImport } from './routes/_authenticated/conta/index'
+import { Route as AuthenticatedContaCarteirasRouteImport } from './routes/_authenticated/conta/carteiras'
+import { Route as AuthenticatedContaFavoritosRouteImport } from './routes/_authenticated/conta/favoritos'
+import { Route as AuthenticatedContaPedidosRouteImport } from './routes/_authenticated/conta/pedidos'
+import { Route as AuthenticatedContaPerfilRouteImport } from './routes/_authenticated/conta/perfil'
+import { Route as AuthenticatedPedidosOrderIdRouteImport } from './routes/_authenticated/pedidos.$orderId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CarrinhoRoute = CarrinhoRouteImport.update({
+  id: '/carrinho',
+  path: '/carrinho',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedCheckoutRoute = AuthenticatedCheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const NftsNftIdRoute = NftsNftIdRouteImport.update({
+  id: '/nfts/$nftId',
+  path: '/nfts/$nftId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedContaIndexRoute = AuthenticatedContaIndexRouteImport.update({
+  id: '/conta/',
+  path: '/conta/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedContaCarteirasRoute =
+  AuthenticatedContaCarteirasRouteImport.update({
+    id: '/conta/carteiras',
+    path: '/conta/carteiras',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedContaFavoritosRoute =
+  AuthenticatedContaFavoritosRouteImport.update({
+    id: '/conta/favoritos',
+    path: '/conta/favoritos',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedContaPedidosRoute =
+  AuthenticatedContaPedidosRouteImport.update({
+    id: '/conta/pedidos',
+    path: '/conta/pedidos',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedContaPerfilRoute =
+  AuthenticatedContaPerfilRouteImport.update({
+    id: '/conta/perfil',
+    path: '/conta/perfil',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPedidosOrderIdRoute =
+  AuthenticatedPedidosOrderIdRouteImport.update({
+    id: '/pedidos/$orderId',
+    path: '/pedidos/$orderId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/carrinho': typeof CarrinhoRoute
+  '/checkout': typeof AuthenticatedCheckoutRoute
+  '/nfts/$nftId': typeof NftsNftIdRoute
+  '/conta/carteiras': typeof AuthenticatedContaCarteirasRoute
+  '/conta/favoritos': typeof AuthenticatedContaFavoritosRoute
+  '/conta/pedidos': typeof AuthenticatedContaPedidosRoute
+  '/conta/perfil': typeof AuthenticatedContaPerfilRoute
+  '/pedidos/$orderId': typeof AuthenticatedPedidosOrderIdRoute
+  '/conta/': typeof AuthenticatedContaIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/carrinho': typeof CarrinhoRoute
+  '/checkout': typeof AuthenticatedCheckoutRoute
+  '/nfts/$nftId': typeof NftsNftIdRoute
+  '/conta/carteiras': typeof AuthenticatedContaCarteirasRoute
+  '/conta/favoritos': typeof AuthenticatedContaFavoritosRoute
+  '/conta/pedidos': typeof AuthenticatedContaPedidosRoute
+  '/conta/perfil': typeof AuthenticatedContaPerfilRoute
+  '/pedidos/$orderId': typeof AuthenticatedPedidosOrderIdRoute
+  '/conta': typeof AuthenticatedContaIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/carrinho': typeof CarrinhoRoute
+  '/_authenticated/checkout': typeof AuthenticatedCheckoutRoute
+  '/nfts/$nftId': typeof NftsNftIdRoute
+  '/_authenticated/conta/carteiras': typeof AuthenticatedContaCarteirasRoute
+  '/_authenticated/conta/favoritos': typeof AuthenticatedContaFavoritosRoute
+  '/_authenticated/conta/pedidos': typeof AuthenticatedContaPedidosRoute
+  '/_authenticated/conta/perfil': typeof AuthenticatedContaPerfilRoute
+  '/_authenticated/pedidos/$orderId': typeof AuthenticatedPedidosOrderIdRoute
+  '/_authenticated/conta/': typeof AuthenticatedContaIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/carrinho'
+    | '/checkout'
+    | '/nfts/$nftId'
+    | '/conta/carteiras'
+    | '/conta/favoritos'
+    | '/conta/pedidos'
+    | '/conta/perfil'
+    | '/pedidos/$orderId'
+    | '/conta/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/carrinho'
+    | '/checkout'
+    | '/nfts/$nftId'
+    | '/conta/carteiras'
+    | '/conta/favoritos'
+    | '/conta/pedidos'
+    | '/conta/perfil'
+    | '/pedidos/$orderId'
+    | '/conta'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/carrinho'
+    | '/_authenticated/checkout'
+    | '/nfts/$nftId'
+    | '/_authenticated/conta/carteiras'
+    | '/_authenticated/conta/favoritos'
+    | '/_authenticated/conta/pedidos'
+    | '/_authenticated/conta/perfil'
+    | '/_authenticated/pedidos/$orderId'
+    | '/_authenticated/conta/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  CarrinhoRoute: typeof CarrinhoRoute
+  NftsNftIdRoute: typeof NftsNftIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +175,108 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/carrinho': {
+      id: '/carrinho'
+      path: '/carrinho'
+      fullPath: '/carrinho'
+      preLoaderRoute: typeof CarrinhoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/checkout': {
+      id: '/_authenticated/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof AuthenticatedCheckoutRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/nfts/$nftId': {
+      id: '/nfts/$nftId'
+      path: '/nfts/$nftId'
+      fullPath: '/nfts/$nftId'
+      preLoaderRoute: typeof NftsNftIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/conta/': {
+      id: '/_authenticated/conta/'
+      path: '/conta'
+      fullPath: '/conta/'
+      preLoaderRoute: typeof AuthenticatedContaIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/conta/carteiras': {
+      id: '/_authenticated/conta/carteiras'
+      path: '/conta/carteiras'
+      fullPath: '/conta/carteiras'
+      preLoaderRoute: typeof AuthenticatedContaCarteirasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/conta/favoritos': {
+      id: '/_authenticated/conta/favoritos'
+      path: '/conta/favoritos'
+      fullPath: '/conta/favoritos'
+      preLoaderRoute: typeof AuthenticatedContaFavoritosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/conta/pedidos': {
+      id: '/_authenticated/conta/pedidos'
+      path: '/conta/pedidos'
+      fullPath: '/conta/pedidos'
+      preLoaderRoute: typeof AuthenticatedContaPedidosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/conta/perfil': {
+      id: '/_authenticated/conta/perfil'
+      path: '/conta/perfil'
+      fullPath: '/conta/perfil'
+      preLoaderRoute: typeof AuthenticatedContaPerfilRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pedidos/$orderId': {
+      id: '/_authenticated/pedidos/$orderId'
+      path: '/pedidos/$orderId'
+      fullPath: '/pedidos/$orderId'
+      preLoaderRoute: typeof AuthenticatedPedidosOrderIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
+interface AuthenticatedRouteChildren {
+  AuthenticatedCheckoutRoute: typeof AuthenticatedCheckoutRoute
+  AuthenticatedContaCarteirasRoute: typeof AuthenticatedContaCarteirasRoute
+  AuthenticatedContaFavoritosRoute: typeof AuthenticatedContaFavoritosRoute
+  AuthenticatedContaPedidosRoute: typeof AuthenticatedContaPedidosRoute
+  AuthenticatedContaPerfilRoute: typeof AuthenticatedContaPerfilRoute
+  AuthenticatedPedidosOrderIdRoute: typeof AuthenticatedPedidosOrderIdRoute
+  AuthenticatedContaIndexRoute: typeof AuthenticatedContaIndexRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedCheckoutRoute: AuthenticatedCheckoutRoute,
+  AuthenticatedContaCarteirasRoute: AuthenticatedContaCarteirasRoute,
+  AuthenticatedContaFavoritosRoute: AuthenticatedContaFavoritosRoute,
+  AuthenticatedContaPedidosRoute: AuthenticatedContaPedidosRoute,
+  AuthenticatedContaPerfilRoute: AuthenticatedContaPerfilRoute,
+  AuthenticatedPedidosOrderIdRoute: AuthenticatedPedidosOrderIdRoute,
+  AuthenticatedContaIndexRoute: AuthenticatedContaIndexRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  CarrinhoRoute: CarrinhoRoute,
+  NftsNftIdRoute: NftsNftIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

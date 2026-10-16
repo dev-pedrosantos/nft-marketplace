@@ -1,4 +1,7 @@
+import { Link, useLocation, useNavigate } from '@tanstack/react-router'
 import favoriteIcon from '@/assets/icons/favorite.svg'
+import { useSession } from '@/features/auth/session-store'
+import { useIsFavorite, useToggleFavorite } from '@/features/favorites/api'
 import { formatEth } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Nft } from '../types'
@@ -14,7 +17,7 @@ interface NftCardProps {
  */
 export function NftCard({ nft, className }: NftCardProps) {
   return (
-    <article className={cn('flex flex-col gap-2 md:gap-3', className)}>
+    <article className={cn('relative flex flex-col gap-2 md:gap-3', className)}>
       <div
         className={cn(
           'relative flex h-[200px] items-center justify-center overflow-hidden rounded-[20px] px-1',
@@ -35,17 +38,20 @@ export function NftCard({ nft, className }: NftCardProps) {
           </span>
         )}
 
-        <button
-          type="button"
-          aria-label={`Favoritar ${nft.name}`}
-          className="absolute top-3 right-[11px] size-7 md:hidden"
-        >
-          <img src={favoriteIcon} alt="" className="block size-full" />
-        </button>
+        <FavoriteButton nft={nft} />
       </div>
 
       <div className="flex flex-col pl-2 md:gap-1.5 md:pl-0">
-        <h3 className="truncate text-[15px] leading-5 md:text-base md:leading-4">{nft.name}</h3>
+        <h3 className="truncate text-[15px] leading-5 md:text-base md:leading-4">
+          {/* The pseudo-element stretches the link over the whole card. */}
+          <Link
+            to="/nfts/$nftId"
+            params={{ nftId: nft.id }}
+            className="after:absolute after:inset-0 after:content-['']"
+          >
+            {nft.name}
+          </Link>
+        </h3>
         <p className="flex items-center gap-3 text-base leading-4 md:text-lg">
           <span className="font-bold text-highlight">{formatEth(nft.priceEth)}</span>
           {nft.previousPriceEth !== undefined && (
@@ -57,5 +63,37 @@ export function NftCard({ nft, className }: NftCardProps) {
         </p>
       </div>
     </article>
+  )
+}
+
+function FavoriteButton({ nft }: { nft: Nft }) {
+  const session = useSession()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isFavorite = useIsFavorite(nft.id)
+  const toggle = useToggleFavorite()
+
+  const onClick = () => {
+    if (!session) {
+      void navigate({
+        to: '.',
+        search: (previous) => ({ ...previous, auth: 'login' as const, redirect: location.href }),
+        resetScroll: false,
+      })
+      return
+    }
+    toggle.mutate({ nft, favorite: !isFavorite })
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={isFavorite ? `Remover ${nft.name} dos favoritos` : `Favoritar ${nft.name}`}
+      aria-pressed={isFavorite}
+      onClick={onClick}
+      className="absolute top-3 right-[11px] z-10 size-7 md:hidden"
+    >
+      <img src={favoriteIcon} alt="" className="block size-full" />
+    </button>
   )
 }

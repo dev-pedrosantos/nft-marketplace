@@ -18,6 +18,7 @@
     --color-highlight: var(--highlight);
     --color-subtle: var(--subtle);
     --color-heading: var(--heading);
+    --color-coral: var(--coral);
 
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -69,6 +70,7 @@
     --highlight: #e89b55;         /* Text/Accent */
     --subtle: #b39463;            /* Color/Secondary */
     --heading: #f7f3ec;           /* Text/Primary */
+    --coral: #f0805f;             /* Text/Coral */
 
     --background: var(--ink);
     --foreground: #f5f1eb;        /* Color/Foreground */
@@ -116,4 +118,22 @@
   body {
     @apply bg-background text-foreground antialiased;
     }
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

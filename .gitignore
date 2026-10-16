@@ -34,3 +34,4 @@ dist-ssr
 
 # Figma exports used as visual reference
 .figma-tmp
+.shots

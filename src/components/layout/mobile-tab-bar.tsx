@@ -65,27 +65,27 @@ export function MobileTabBar({ className }: { className?: string }) {
       >
         <img src={tabHome} alt="" className="h-[16.67px] w-[15.83px]" />
       </Link>
-      <button
-        type="button"
+      <Link
+        to="/conta/favoritos"
         aria-label="Favoritos"
         className={cn(tabItemClass, 'pointer-events-auto top-[72px] left-[28.5%]')}
       >
         <img src={tabHeart} alt="" className="h-[17.79px] w-5" />
-      </button>
-      <button
-        type="button"
+      </Link>
+      <Link
+        to="/carrinho"
         aria-label="Carrinho"
         className={cn(tabItemClass, 'pointer-events-auto left-[72.95%]')}
       >
         <img src={tabCart} alt="" className="size-5" />
-      </button>
-      <button
-        type="button"
+      </Link>
+      <Link
+        to="/conta/perfil"
         aria-label="Perfil"
         className={cn(tabItemClass, 'pointer-events-auto left-[87.92%]')}
       >
         <img src={tabUser} alt="" className="size-5" />
-      </button>
+      </Link>
     </nav>
   )
 }
