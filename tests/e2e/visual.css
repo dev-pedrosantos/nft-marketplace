@@ -1,0 +1,5 @@
+/* Development-only overlays: the suite runs against the Vite dev server. */
+button[aria-label='Open TanStack Router Devtools'],
+button[aria-label='Open Tanstack query devtools'] {
+  visibility: hidden !important;
+}

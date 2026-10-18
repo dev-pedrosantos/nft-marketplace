@@ -1,5 +1,5 @@
-import emeraldApe from '@/assets/nfts/emerald-ape.png'
-import neonVessel from '@/assets/nfts/neon-vessel.png'
+import emeraldApe from '@/assets/nfts/emerald-ape.webp'
+import neonVessel from '@/assets/nfts/neon-vessel.webp'
 import type { Promotion } from '@/features/promotions/types'
 
 export const promotions: Promotion[] = [

@@ -10,7 +10,7 @@ import { BlogPostCard } from '@/features/blog/components/blog-post-card'
 import { nftQueries } from '@/features/nfts/api'
 import { CatalogFilters } from '@/features/nfts/components/catalog-filters'
 import { FeaturedNftBanner } from '@/features/nfts/components/featured-nft-banner'
-import { NftGrid } from '@/features/nfts/components/nft-grid'
+import { NftGrid, NftGridSkeleton } from '@/features/nfts/components/nft-grid'
 import { NftTabs } from '@/features/nfts/components/nft-tabs'
 import { SortLabel } from '@/features/nfts/components/sort-label'
 import type { Nft, NftListParams } from '@/features/nfts/types'
@@ -21,6 +21,7 @@ import { CATALOG_SECTION_ID, HomeHero, MobileHeroBanner } from './components/hom
 import type { HomeSearch } from './search'
 
 const BLOG_POST_LIMIT = 4
+const CATALOG_PAGE_SIZE = 8
 
 export function HomePage() {
   const search = useSearch({ from: '/' })
@@ -168,13 +169,7 @@ export function HomePage() {
 }
 
 function CatalogResults({ query }: { query: UseQueryResult<Paginated<Nft>> }) {
-  if (query.isPending) {
-    return (
-      <p role="status" className="py-20 text-center text-sm text-muted-foreground">
-        Carregando NFTs…
-      </p>
-    )
-  }
+  if (query.isPending) return <NftGridSkeleton count={CATALOG_PAGE_SIZE} />
 
   if (query.isError) {
     return (

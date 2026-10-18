@@ -6,8 +6,8 @@ Não há backend real: a API REST e o Socket.IO são simulados no navegador pelo
 persistido no `localStorage`. **Não existe blockchain nem pagamento real**: a compra é simulada e o
 resultado depende apenas da resposta da API mockada.
 
-A arquitetura (camadas, cache, sessão, checkout idempotente, tempo real e mocks) está descrita em
-[`docs/architecture.md`](docs/architecture.md).
+A arquitetura (camadas, cache, sessão, checkout idempotente, tempo real, mocks, performance),
+os desvios do Figma e as limitações estão em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Telas e funcionalidades
 
@@ -38,7 +38,8 @@ e volta à página pedida depois de entrar.
 | Estilos | Tailwind CSS (plugin Vite) | 4 |
 | Componentes | shadcn/ui + Radix | CLI 4 |
 | Mock de API | MSW + `@mswjs/socket.io-binding` | 2.15 / 0.2 |
-| Testes E2E | Playwright | 1.64 |
+| Testes E2E e regressão visual | Playwright | 1.64 |
+| Auditoria de performance | Lighthouse | 13.5 |
 
 > O MSW está fixado na linha 2.x porque o `@mswjs/socket.io-binding` só é compatível com
 > `msw@^2.10.2`.
@@ -52,9 +53,11 @@ e volta à página pedida depois de entrar.
 
 ```bash
 npm install
-npm run dev       # http://localhost:5173, com os mocks ativos
-npm run build     # typecheck + build de produção em dist/
-npm run preview   # serve o build de produção
+npm run dev          # http://localhost:5173, com os mocks ativos
+npm run build        # typecheck + build de produção em dist/, sem mocks
+npm run build:demo   # typecheck + build de demonstração em dist/, com os mocks (usado no deploy)
+npm run preview      # serve o conteúdo de dist/
+npm run lighthouse   # build:demo + auditoria Lighthouse (ver "Performance")
 ```
 
 ### Contas de demonstração
@@ -91,7 +94,7 @@ O `.env.development` (versionado) ativa os mocks em `npm run dev` e define
   VITE_SOCKET_URL=https://seu-socket.exemplo.com
   ```
 
-- **Build de demonstração com mocks:** `VITE_ENABLE_MOCKS=true npm run build`.
+- **Build de demonstração com mocks:** `npm run build:demo` (modo `demo`, variáveis em `.env.demo`).
 
 O "banco" simulado fica em `localStorage['kurio.mock-db']` e sobrevive a recarregamentos. Para
 voltar aos dados iniciais, rode `__kurioMock.reset()` no console ou limpe o `localStorage`.
@@ -140,15 +143,19 @@ Outros utilitários do console: `__kurioMock.active()`, `disable(cenário)`, `re
 
 ## Build de produção e deploy
 
-Não há deploy público configurado neste repositório.
-
 - `npm run build` gera um build **sem mocks**: o MSW fica fora do bundle e o app espera uma API real
   em `VITE_API_URL`.
-- Para uma demonstração sem backend, gere o build com `VITE_ENABLE_MOCKS=true npm run build`. O
-  service worker (`mockServiceWorker.js`, copiado de `public/`) precisa ser servido na raiz do site.
+- `npm run build:demo` gera o build de demonstração: lê `.env.demo` (mocks ligados, socket na
+  própria origem) e inclui o MSW. O service worker (`mockServiceWorker.js`, copiado de `public/`)
+  precisa ser servido na raiz do site.
 - As rotas são do lado do cliente: o host precisa responder `index.html` para qualquer caminho
   desconhecido (fallback de SPA). Sem isso, recarregar `/carrinho` ou `/nfts/:id` retorna 404.
   O `npm run preview` já faz esse fallback e serve para conferir o build localmente.
+
+**Vercel:** o `vercel.json` já define `npm ci`, `npm run build:demo`, a saída `dist/`, o fallback
+de SPA (arquivos estáticos têm precedência sobre o rewrite) e cache longo para `/assets`. Basta
+importar o repositório na Vercel (ou rodar `npx vercel --prod`); nenhuma variável de ambiente
+precisa ser configurada no painel.
 
 ## Testes
 
@@ -176,6 +183,15 @@ iniciais, com o cenário `no-latency` ligado.
 | `footer.spec.ts` | Coleções do rodapé filtrando o catálogo, links da conta com e sem sessão, e-mail e telefone |
 | `coming-soon.spec.ts` | Aviso "Em breve" nos itens sem destino do header e do rodapé: abre no clique (não no hover), fecha pelo X, por Esc e clicando fora, fica centralizado e devolve o foco |
 | `smoke.spec.ts` | Montagem da aplicação, service worker do MSW e conexão Socket.IO |
+| `visual.spec.ts` | Regressão visual de página inteira de Início, Detalhe, Carrinho e Pagamento, com baselines versionadas |
+
+**Regressão visual:** as baselines ficam em `tests/e2e/visual.spec.ts-snapshots/` e foram geradas
+no Linux (Chromium do Playwright). Depois de uma mudança visual intencional, atualize com
+`npx playwright test tests/e2e/visual.spec.ts --update-snapshots` e revise as imagens no diff.
+
+**Relatório e traces:** cada execução gera o relatório HTML em `playwright-report/`
+(`npm run test:e2e:report`). Testes que falham guardam trace e captura em `test-results/`; abra o
+trace com `npx playwright show-trace <arquivo>.zip`.
 
 Quatro testes rodam só no `desktop`: a ordenação do catálogo e os itens "Em breve" do header (o
 seletor e o header não existem no layout mobile do Figma), o foco visível por Tab (cenário de
@@ -209,6 +225,19 @@ npm run lint        # ESLint
 npm run check       # typecheck + lint + testes E2E
 ```
 
+### Performance (Lighthouse)
+
+```bash
+npm run lighthouse
+```
+
+Gera o build de demonstração, serve com `vite preview` e audita Início e Detalhe três vezes nos
+perfis mobile e desktop. A configuração versionada fica em `lighthouse/config.mjs`; os relatórios
+HTML/JSON de cada execução vão para `lighthouse/reports/`, e as medianas por categoria, LCP, CLS,
+TBT, versões e ambiente vão para [`lighthouse/summary.md`](lighthouse/summary.md) e
+`lighthouse/summary.json`. O Chrome usado é o Chromium do Playwright (ou `CHROME_PATH`). A análise
+dos resultados abaixo da meta está em `ARCHITECTURE.md`.
+
 ## Estrutura do projeto
 
 ```
@@ -223,27 +252,9 @@ src/
 ├── pages/          # telas compostas a partir das features
 ├── routes/         # rotas do TanStack Router (arquivos finos que apontam para pages)
 └── main.tsx        # entrada: inicia o MSW e só então carrega a aplicação
-tests/e2e/          # specs Playwright e helpers (support.ts)
-docs/               # documentação de arquitetura
+tests/e2e/          # specs Playwright, helpers (support.ts) e baselines visuais
+lighthouse/         # configuração, relatórios e medianas da auditoria Lighthouse
+scripts/            # script da auditoria Lighthouse
+ARCHITECTURE.md     # arquitetura, desvios do Figma e limitações
+vercel.json         # deploy na Vercel (build de demonstração + fallback de SPA)
 ```
-
-## Diferenças conscientes em relação ao Figma
-
-- O visitante começa com o carrinho vazio, então o contador "6" do header do Figma só aparece com itens.
-- O checkout vem preenchido com a carteira principal (o Figma mostra os campos vazios) e o provedor
-  de pagamento começa sem seleção (o Figma mostra Coinbase marcado), para que a escolha seja explícita.
-- No checkout, o nome ENS tem um campo de texto além do seletor `.eth` do Figma, porque a validação exige o nome.
-- No carrinho mobile, o Figma mostra a lixeira em um único item, sobreposta ao botão "+"; no app ela
-  fica no canto de cada item, sem cobrir o controle de quantidade.
-- Os frames de Perfil e Carteiras do Figma terminam sem rodapé; no app essas telas usam o mesmo
-  rodapé das demais páginas.
-- O Figma não tem frame mobile da confirmação; em telas estreitas o recibo empilha quantidade e
-  subtotal e deixa os nomes quebrarem linha.
-- "Ver no Etherscan" no recibo apenas avisa que a transação é simulada.
-- O Figma não define destinos para o rodapé. No app, "Meu perfil", "Atividade" e "Lista de
-  interesse" levam às telas da conta, e as coleções filtram o catálogo da página inicial
-  (`/?collection=<id>#catalogo`). Os ícones de redes sociais não são links, porque a marca não
-  tem perfis oficiais.
-- Itens do header e do rodapé sem tela correspondente ("Criadores", "Aprenda", "Minha coleção",
-  "Estúdio do criador" e a coluna "Central de ajuda") abrem, no clique, um aviso "Em breve"
-  (`src/components/coming-soon.tsx`), construído sobre o diálogo compartilhado.

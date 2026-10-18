@@ -133,6 +133,9 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
 
 - Layouts para 390, 768 e 1440 px. Quando o Figma tem composições diferentes para desktop e mobile,
   as duas versões existem no DOM e uma fica oculta por CSS.
+- O rodapé usa as medidas fixas do frame desktop só a partir de 1440 px (breakpoint `wide`, em
+  `index.css`). Entre 1024 e 1439 px ele usa a grade do tablet; com as medidas do Figma, títulos se
+  sobrepunham e os links vazavam do rodapé a 1280 px.
 - Diálogos usam Radix (foco preso, Escape, título acessível). Grupos de escolha usam
   `role="radiogroup"`, quantidades têm rótulos por item e mensagens de erro usam `role="alert"`.
 - Foco visível global para teclado (`:focus-visible`) e `prefers-reduced-motion` reduzindo
@@ -146,6 +149,74 @@ cenários e espera pela conexão do socket. A lista do que cada spec cobre está
 
 O `vite.config.ts` ignora `playwright-report` e `test-results` no watcher: sem isso, o relatório
 gravado durante a execução recarregava todas as páginas abertas no meio dos testes.
+
+`visual.spec.ts` compara capturas de página inteira de Início, Detalhe, Carrinho e Pagamento nos
+dois projetos com as baselines versionadas em `tests/e2e/visual.spec.ts-snapshots/`. Para os
+dados serem estáveis, o teste parte do banco inicial sem latência, fixa o relógio do navegador,
+força o carregamento das imagens lazy, espera as fontes e desliga animações. `visual.css` esconde os
+botões das devtools, que só existem no servidor de desenvolvimento usado pelos testes. As
+baselines têm sufixo `-linux` porque a renderização de fontes muda entre sistemas operacionais.
+
+## Performance e Lighthouse
+
+`npm run lighthouse` gera o build de demonstração (`build:demo`, com MSW e o cenário padrão de
+mocks, incluindo a latência de 250 ms), serve com `vite preview` e audita Início e Detalhe três
+vezes em cada perfil. A configuração está em `lighthouse/config.mjs`: perfil mobile padrão do
+Lighthouse (Moto G Power, 4G lento, CPU 4x mais lenta) e perfil desktop padrão, ambos com
+throttling simulado. O script grava os relatórios HTML/JSON de cada execução em
+`lighthouse/reports/`, e as medianas, o ambiente e as versões em `lighthouse/summary.md` e
+`lighthouse/summary.json`. O Chrome é iniciado pelo próprio script (o `chrome-launcher` não
+funciona no WSL) com o Chromium do Playwright, ou com `CHROME_PATH`.
+
+Desktop fica em 99–100 em todas as categorias. No mobile, Accessibility, Best Practices e SEO estão
+na meta; Performance fica abaixo de 90 (mediana em `lighthouse/summary.md`), com CLS ~0 e LCP
+entre 3,2 e 3,4 s.
+
+**Causa:** sem SSR, a primeira pintura depende de baixar e executar a cadeia de JavaScript na CPU
+simulada 4x mais lenta: entrada (React) → chunk do MSW (173 KB gzip) → registro do service worker →
+chunk do app. A ordem é obrigatória: o app só pode ser avaliado depois que o MSW intercepta o
+`WebSocket`, porque o `engine.io-client` captura o construtor ao carregar. No navegador sem
+throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
+
+**O que foi feito:**
+
+- Skeleton do catálogo com as dimensões dos cards: o CLS da Início mobile caiu de 0,50 para 0.
+- `meta description` e `robots.txt`: SEO de 83 para 100.
+- Início e Detalhe saem no chunk do app em vez de chunks de rota (`splitBehavior` no
+  `vite.config.ts`), o que elimina uma ida e volta de rede antes da primeira pintura: Performance
+  mobile da Início de ~86 para ~87–89.
+- As artes dos NFTs passaram de PNG 1254 px (~1,9 MB cada) para WebP 800 px (~45 KB). O LCP
+  simulado não mudou, mas o download caiu de 7,8 MB para 175 KB.
+- `fetchPriority="high"` na imagem principal do Detalhe, que é o LCP da página.
+
+**O que não foi feito:**
+
+- `modulepreload` do MSW e do app no HTML: as duas cargas passam a disputar banda com o CSS e a
+  entrada, e o FCP mobile piorou de 2,2 para 3,3 s.
+- Remover o MSW, adiar a interceptação do socket ou prerenderizar o HTML só para a auditoria.
+
+## Desvios do Figma e decisões de UX
+
+- O visitante começa com o carrinho vazio, então o contador "6" do header do Figma só aparece com itens.
+- O checkout vem preenchido com a carteira principal (o Figma mostra os campos vazios) e o provedor
+  de pagamento começa sem seleção (o Figma mostra Coinbase marcado), para que a escolha seja explícita.
+- No checkout, o nome ENS tem um campo de texto além do seletor `.eth` do Figma, porque a validação exige o nome.
+- No carrinho mobile, o Figma mostra a lixeira em um único item, sobreposta ao botão "+"; no app ela
+  fica no canto de cada item, sem cobrir o controle de quantidade.
+- Os frames de Perfil e Carteiras do Figma terminam sem rodapé; no app essas telas usam o mesmo
+  rodapé das demais páginas.
+- O Figma não tem frame mobile da confirmação; em telas estreitas o recibo empilha quantidade e
+  subtotal e deixa os nomes quebrarem linha.
+- "Ver no Etherscan" no recibo apenas avisa que a transação é simulada.
+- O Figma não define destinos para o rodapé. No app, "Meu perfil", "Atividade" e "Lista de
+  interesse" levam às telas da conta, e as coleções filtram o catálogo da página inicial
+  (`/?collection=<id>#catalogo`). Os ícones de redes sociais não são links, porque a marca não
+  tem perfis oficiais.
+- Itens do header e do rodapé sem tela correspondente ("Criadores", "Aprenda", "Minha coleção",
+  "Estúdio do criador" e a coluna "Central de ajuda") abrem, no clique, um aviso "Em breve"
+  (`src/components/coming-soon.tsx`), construído sobre o diálogo compartilhado.
+- As artes dos NFTs são as imagens exportadas do Figma, convertidas de PNG 1254 px para WebP 800 px
+  (o maior uso é 404 px no detalhe desktop, então 800 px cobrem telas 2x).
 
 ## Limitações conhecidas
 

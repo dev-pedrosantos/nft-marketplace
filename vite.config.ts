@@ -8,7 +8,15 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [
     // Must run before @vitejs/plugin-react.
-    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+      codeSplittingOptions: {
+        // Entry pages ship with the app chunk: a lazy route chunk adds one more network
+        // round trip before their first paint.
+        splitBehavior: ({ routeId }) => (routeId === '/' || routeId === '/nfts/$nftId' ? [] : undefined),
+      },
+    }),
     react(),
     tailwindcss(),
   ],

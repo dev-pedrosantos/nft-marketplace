@@ -1,7 +1,7 @@
-import emeraldApe from '@/assets/nfts/emerald-ape.png'
-import goldenBeat from '@/assets/nfts/golden-beat.png'
-import neonVessel from '@/assets/nfts/neon-vessel.png'
-import sageNomad from '@/assets/nfts/sage-nomad.png'
+import emeraldApe from '@/assets/nfts/emerald-ape.webp'
+import goldenBeat from '@/assets/nfts/golden-beat.webp'
+import neonVessel from '@/assets/nfts/neon-vessel.webp'
+import sageNomad from '@/assets/nfts/sage-nomad.webp'
 import type { BlogPost } from '@/features/blog/types'
 
 // The design shows only day and month; the year matches the footer copyright (2026).

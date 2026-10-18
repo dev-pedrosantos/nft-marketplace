@@ -279,7 +279,7 @@ function Gallery({ nft }: { nft: NftDetails }) {
       </ul>
 
       <div className="flex size-[444px] shrink-0 items-center justify-center rounded-[6px] bg-surface-card p-4">
-        <img src={image} alt={nft.name} className="size-[404px] rounded-[24px] object-cover" />
+        <img src={image} alt={nft.name} fetchPriority="high" className="size-[404px] rounded-[24px] object-cover" />
       </div>
 
       <button
@@ -507,6 +507,7 @@ function MobileDetails(props: MobileDetailsProps) {
         <img
           src={nft.imageUrl}
           alt={nft.name}
+          fetchPriority="high"
           className="absolute top-[66px] left-1/2 h-[356px] w-[calc(100%-53px)] max-w-[361px] -translate-x-1/2 rounded-[24px] object-cover"
         />
         <img src={galleryDots} alt="" className="absolute top-[365px] left-1/2 h-[7px] w-14 -translate-x-1/2" />

@@ -102,46 +102,46 @@ const SOCIAL_LINKS = [
 export function SiteFooter({ className }: { className?: string }) {
   return (
     <footer className={cn('flex flex-col', className)}>
-      <div className="bg-surface-card p-6 md:p-8 xl:h-[250px]">
-        <div className="grid gap-8 md:grid-cols-3 xl:flex xl:h-full xl:items-start xl:gap-0">
+      <div className="bg-surface-card p-6 md:p-8 wide:h-[250px]">
+        <div className="grid gap-8 md:grid-cols-3 wide:flex wide:h-full wide:items-start wide:gap-0">
           {HIGHLIGHTS.map((item, index) => (
             <div key={item.letter} className="contents">
-              {index > 0 && <span aria-hidden className="hidden w-px self-stretch bg-primary xl:block" />}
-              <div className="flex flex-col gap-3 xl:min-w-0 xl:flex-1 xl:px-4">
+              {index > 0 && <span aria-hidden className="hidden w-px self-stretch bg-primary wide:block" />}
+              <div className="flex flex-col gap-3 wide:min-w-0 wide:flex-1 wide:px-4">
                 <span className="grid size-[74px] place-items-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
                   {item.letter}
                 </span>
-                <h2 className="text-[17px] leading-4 font-bold xl:whitespace-nowrap">{item.title}</h2>
-                <p className="text-sm leading-[22px] text-muted-foreground xl:w-[204px]">
+                <h2 className="text-[17px] leading-4 font-bold wide:whitespace-nowrap">{item.title}</h2>
+                <p className="text-sm leading-[22px] text-muted-foreground wide:w-[204px]">
                   {item.description}
                 </p>
               </div>
             </div>
           ))}
-          <span aria-hidden className="hidden w-px self-stretch bg-primary xl:block" />
-          <NewsletterForm className="md:col-span-3 xl:h-full xl:w-[357px] xl:px-4" />
+          <span aria-hidden className="hidden w-px self-stretch bg-primary wide:block" />
+          <NewsletterForm className="md:col-span-3 wide:h-full wide:w-[357px] wide:px-4" />
         </div>
       </div>
 
-      <div className="grid gap-4 bg-surface-dark p-6 text-sm leading-[22px] sm:grid-cols-2 md:p-8 xl:flex xl:h-[88px] xl:items-center xl:gap-[92px]">
-        <p className="py-2 leading-[normal] font-bold tracking-[1.4px] xl:flex-1">KURIO</p>
-        <p className="xl:flex-1 xl:whitespace-nowrap">
+      <div className="grid gap-4 bg-surface-dark p-6 text-sm leading-[22px] sm:grid-cols-2 md:p-8 wide:flex wide:h-[88px] wide:items-center wide:gap-[92px]">
+        <p className="py-2 leading-[normal] font-bold tracking-[1.4px] wide:flex-1">KURIO</p>
+        <p className="wide:flex-1 wide:whitespace-nowrap">
           Feito para colecionadores,
           <br />
           criadores e cultura
         </p>
-        <a href="mailto:contato@email.com" className="hover:text-highlight xl:flex-1">
+        <a href="mailto:contato@email.com" className="hover:text-highlight wide:flex-1">
           contato@email.com
         </a>
-        <a href="tel:+551140028922" className="hover:text-highlight xl:w-[228px]">
+        <a href="tel:+551140028922" className="hover:text-highlight wide:w-[228px]">
           +55 11 4002 8922
         </a>
       </div>
 
       <div className="flex flex-col items-center gap-1.5">
-        <div className="grid w-full gap-8 bg-surface-card p-6 sm:grid-cols-2 md:p-8 lg:grid-cols-4 xl:flex xl:h-[236px] xl:gap-[124px]">
+        <div className="grid w-full gap-8 bg-surface-card p-6 sm:grid-cols-2 md:p-8 lg:grid-cols-4 wide:flex wide:h-[236px] wide:gap-[124px]">
           {LINK_COLUMNS.map((column) => (
-            <nav key={column.title} aria-label={column.title} className="flex flex-col gap-2 xl:flex-1">
+            <nav key={column.title} aria-label={column.title} className="flex flex-col gap-2 wide:flex-1">
               <h2 className="text-lg leading-4 font-bold">{column.title}</h2>
               <ul className="text-sm leading-[30px]">
                 {column.links.map((link) => (
@@ -153,7 +153,7 @@ export function SiteFooter({ className }: { className?: string }) {
             </nav>
           ))}
 
-          <div className="flex flex-col gap-8 xl:w-[228px]">
+          <div className="flex flex-col gap-8 wide:w-[228px]">
             <div className="flex flex-col gap-5">
               <h2 className="text-lg leading-4 font-bold">Redes sociais</h2>
               <ul className="flex items-center gap-2.5">

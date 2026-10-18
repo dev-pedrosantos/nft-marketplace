@@ -1,7 +1,7 @@
-import emeraldApe from '@/assets/nfts/emerald-ape.png'
-import goldenBeat from '@/assets/nfts/golden-beat.png'
-import neonVessel from '@/assets/nfts/neon-vessel.png'
-import sageNomad from '@/assets/nfts/sage-nomad.png'
+import emeraldApe from '@/assets/nfts/emerald-ape.webp'
+import goldenBeat from '@/assets/nfts/golden-beat.webp'
+import neonVessel from '@/assets/nfts/neon-vessel.webp'
+import sageNomad from '@/assets/nfts/sage-nomad.webp'
 import type { CatalogFilters, EditionId, FeaturedNft } from '@/features/nfts/types'
 import type { DecimalString } from '@/lib/money'
 
