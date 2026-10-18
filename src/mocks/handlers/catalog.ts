@@ -33,7 +33,9 @@ export const catalogHandlers: HttpHandler[] = [
       : 'recent'
     const page = Math.max(1, Math.floor(parseNumber(params.get('page')) ?? 1))
     const search = params.get('search')?.trim().toLowerCase()
-    const collection = params.get('collection')
+    // Without a collection the first one applies, as on the home page, so the list does not
+    // have to wait for `/catalog/filters` to learn the default.
+    const collection = params.get('collection') || catalogFilters.collections[0]?.id
     const network = params.get('network')
     const minPrice = parseNumber(params.get('minPrice'))
     const maxPrice = parseNumber(params.get('maxPrice'))

@@ -48,16 +48,13 @@ export function HomePage() {
     tab: search.tab ?? 'all',
     page: search.page ?? 1,
     sort: search.sort,
-    collection,
+    collection: search.collection,
     network: search.network,
     minPrice: search.minPrice,
     maxPrice: search.maxPrice,
     search: search.q,
   }
-  const nftsQuery = useQuery({
-    ...nftQueries.list(listParams),
-    enabled: !filtersQuery.isPending,
-  })
+  const nftsQuery = useQuery(nftQueries.list(listParams))
 
   const [filtersOpen, setFiltersOpen] = useState(false)
 
@@ -120,9 +117,12 @@ export function HomePage() {
 
         <section
           id={CATALOG_SECTION_ID}
-          aria-label="Catálogo de NFTs"
+          aria-labelledby="catalog-title"
           className="flex scroll-mt-6 items-start gap-12"
         >
+          <h2 id="catalog-title" className="sr-only">
+            Catálogo de NFTs
+          </h2>
           <aside className="hidden w-[310px] shrink-0 flex-col gap-6 lg:flex">
             {renderFilters()}
             {featuredQuery.data && <FeaturedNftBanner nft={featuredQuery.data} />}

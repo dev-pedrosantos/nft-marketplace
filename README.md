@@ -105,7 +105,7 @@ voltar aos dados iniciais, rode `__kurioMock.reset()` no console ou limpe o `loc
 | Domínio | Endpoints |
 | --- | --- |
 | Autenticação | `POST /auth/login`, `POST /auth/register`, `POST /auth/logout`, `GET /auth/me` |
-| Catálogo | `GET /nfts?tab&sort&page&search&collection&network&minPrice&maxPrice`, `GET /nfts/featured`, `GET /nfts/:id`, `GET /nfts/:id/related`, `GET /catalog/filters` |
+| Catálogo | `GET /nfts?tab&sort&page&search&collection&network&minPrice&maxPrice` (sem `collection`, vale a primeira coleção; a busca ignora a coleção), `GET /nfts/featured`, `GET /nfts/:id`, `GET /nfts/:id/related`, `GET /catalog/filters` |
 | Carrinho | `GET /cart?network`, `GET /cart/summary`, `POST /cart/items`, `PATCH /cart/items/:lineId`, `DELETE /cart/items/:lineId`, `POST /cart/items/:lineId/accept-price`, `POST /cart/coupon`, `DELETE /cart/coupon` |
 | Checkout e pedidos | `POST /checkout/quote`, `POST /orders` (exige `Idempotency-Key` e carteira conectada), `GET /orders`, `GET /orders/:id` |
 | Conta | `PUT /me/profile`, `PUT /me/password`, `PUT /me/avatar`, `DELETE /me/avatar`, `GET/POST /me/wallets`, `PUT/DELETE /me/wallets/:id`, `GET/POST/DELETE /me/wallet-connection`, `GET /me/favorites`, `PUT/DELETE /me/favorites/:nftId` |

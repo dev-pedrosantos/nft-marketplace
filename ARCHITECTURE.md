@@ -220,9 +220,14 @@ throttling simulado. O script grava os relatórios HTML/JSON de cada execução 
 `lighthouse/summary.json`. O Chrome é iniciado pelo próprio script (o `chrome-launcher` não
 funciona no WSL) com o Chromium do Playwright, ou com `CHROME_PATH`.
 
-Desktop fica em 99–100 em todas as categorias. No mobile, Accessibility, Best Practices e SEO estão
-na meta; Performance fica abaixo de 90 (mediana em `lighthouse/summary.md`), com CLS ~0 e LCP
-entre 3,2 e 3,4 s.
+Desktop fica em 99–100 em todas as categorias. No mobile, Accessibility, Best Practices e SEO ficam
+em 100; Performance fica abaixo de 90 (mediana em `lighthouse/summary.md`, entre 84 e 89 conforme a
+execução), com CLS ~0 e LCP entre 3,2 e 3,5 s.
+
+No mobile, o LCP da Início é o fundo do banner (um SVG embutido), que no navegador sem throttling
+pinta junto com o primeiro conteúdo, por volta de 356 ms. O LCP simulado soma a cadeia de
+JavaScript e as requisições iniciadas antes dessa pintura (API, fonte e as artes do banner), que
+disputam a mesma banda de 4G lento.
 
 **Causa:** sem SSR, a primeira pintura depende de baixar e executar a cadeia de JavaScript na CPU
 simulada 4x mais lenta: entrada (React) → chunk do MSW (173 KB gzip) → registro do service worker →
@@ -240,12 +245,20 @@ throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
 - As artes dos NFTs passaram de PNG 1254 px (~1,9 MB cada) para WebP 800 px (~45 KB). O LCP
   simulado não mudou, mas o download caiu de 7,8 MB para 175 KB.
 - `fetchPriority="high"` na imagem principal do Detalhe, que é o LCP da página.
+- A lista do catálogo não espera mais `/catalog/filters`: sem `collection`, a API aplica a primeira
+  coleção, a mesma que a Início mostra selecionada. No navegador sem throttling os cards chegam
+  por volta de 670 ms em vez de 950 ms; a nota simulada não muda, porque o LCP é o banner.
+- Um `h2` só para leitores de tela abre a seção do catálogo. No mobile a coluna de filtros fica
+  oculta e os títulos dos cards vinham logo depois do `h1`: Accessibility da Início mobile de 99
+  para 100.
 
 **O que não foi feito:**
 
 - `modulepreload` do MSW e do app no HTML: as duas cargas passam a disputar banda com o CSS e a
   entrada, e o FCP mobile piorou de 2,2 para 3,3 s.
 - Remover o MSW, adiar a interceptação do socket ou prerenderizar o HTML só para a auditoria.
+- Adiar as chamadas à API para depois da primeira pintura: tiraria essas requisições da conta do
+  LCP simulado, mas atrasaria o catálogo para o usuário real só para melhorar a medição.
 
 ## Desvios do Figma e decisões de UX
 
