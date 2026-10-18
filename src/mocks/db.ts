@@ -200,6 +200,14 @@ function load(): DbState {
 
 export let db: DbState = load()
 
+// Each open tab runs its own copy of the simulated backend. Without adopting what another tab
+// writes, a session opened there is unknown here: this tab answers 401 and, through the shared
+// session, signs every tab out; its next write would also discard the other tab's changes.
+window.addEventListener('storage', (event) => {
+  if (event.storageArea !== localStorage) return
+  if (event.key === STORAGE_KEY || event.key === null) db = load()
+})
+
 export function commit() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db))
 }

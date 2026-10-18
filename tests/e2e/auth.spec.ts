@@ -27,6 +27,32 @@ test.describe('autenticação e sessão', () => {
     await expect(authDialog(page)).toBeVisible()
   })
 
+  test('login em outra aba vale nas duas, sem derrubar a sessão', async ({ page }) => {
+    await page.goto('/')
+    await waitForMocks(page)
+    const firstTabCart = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/cart/summary' &&
+        response.request().headers().authorization !== undefined,
+    )
+
+    const secondTab = await page.context().newPage()
+    await login(secondTab)
+
+    expect((await firstTabCart).status()).toBe(200)
+    const token = await page.evaluate(() => JSON.parse(localStorage.getItem('kurio.session')!).token as string)
+    const me = await page.evaluate(
+      (value) => fetch('/api/auth/me', { headers: { Authorization: `Bearer ${value}` } }).then((response) => response.status),
+      token,
+    )
+    expect(me).toBe(200)
+
+    await secondTab.goto('/conta/perfil')
+    await expect(secondTab.getByLabel('Nome de exibição')).toHaveValue(DEMO_USER.name)
+    await page.goto('/conta/perfil')
+    await expect(page.getByLabel('Nome de exibição')).toHaveValue(DEMO_USER.name)
+  })
+
   test('rota privada pede login e volta para a página pedida', async ({ page }) => {
     await page.goto('/conta/carteiras')
     await expect(page).toHaveURL(/auth=login/)

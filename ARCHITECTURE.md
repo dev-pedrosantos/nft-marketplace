@@ -154,6 +154,10 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
 
 - **`src/mocks/db.ts`:** banco em `localStorage['kurio.mock-db']` (usuários, sessões com TTL de
   30 minutos, carrinhos, cotações, pedidos, estoque e preços), criado a partir de `src/mocks/data`.
+  Cada aba tem sua cópia em memória e troca pela gravada quando outra aba escreve (evento
+  `storage`). Sem isso, um login feito numa aba criava uma sessão que as outras não conheciam:
+  elas respondiam 401 e, pela sessão compartilhada, deslogavam todas as abas. A liquidação de
+  pedidos busca o pedido pelo id quando o timer dispara, porque o banco pode ter sido trocado.
 - **`src/mocks/passwords.ts`:** o banco guarda só o hash da senha (PBKDF2-SHA256 via
   `crypto.subtle`, 100 mil iterações e salt aleatório por usuário), nunca o texto. Login e troca de
   senha recalculam o hash e comparam todos os bytes. As contas de demonstração já vêm com o hash de
@@ -309,9 +313,11 @@ da Início é o fundo do banner (um SVG embutido); o do Detalhe é a arte do NFT
 - Não há blockchain, carteira real nem gateway de pagamento. "Ver no Etherscan" apenas avisa que a
   transação é simulada; os botões de login social e "Esqueceu a senha?" mostram um aviso de que
   não estão disponíveis na demonstração.
-- O banco simulado vive no `localStorage` do navegador e é carregado quando a aba abre. Mudanças
-  feitas em outra aba só aparecem depois de recarregar, e a última aba a gravar prevalece. Outros
-  navegadores não veem os dados.
+- O banco simulado vive no `localStorage` do navegador, e cada aba roda sua própria cópia do
+  backend, que adota o que as outras gravam. Os dados ficam iguais entre abas, mas os eventos de
+  tempo real só saem na aba que fez a mudança: uma alteração de preço feita em outra aba aparece
+  na próxima consulta à API, não por `nft.updated`. Gravações simultâneas em duas abas não são
+  mescladas (a última prevalece), e outros navegadores não veem os dados.
 - As senhas ficam com hash no banco simulado, mas o banco inteiro (inclusive sessões) está no
   `localStorage` do próprio navegador. O hash evita guardar a senha em texto puro, mas não substitui
   um backend: quem tem acesso ao navegador pode alterar os dados diretamente.

@@ -84,7 +84,15 @@ function toOrderUpdate(order: OrderRecord) {
 function schedule(order: OrderRecord) {
   if (order.status !== 'pending' || timers.has(order.id)) return
   const wait = Math.max(0, order.settleAt - Date.now())
-  timers.set(order.id, setTimeout(() => settle(order), wait))
+  // Looked up again when the timer fires: another tab may have replaced the database meanwhile.
+  timers.set(
+    order.id,
+    setTimeout(() => {
+      timers.delete(order.id)
+      const current = db.orders.find((item) => item.id === order.id)
+      if (current) settle(current)
+    }, wait),
+  )
 }
 
 /** Pending orders survive reloads: settle the overdue ones and re-arm the rest. */
