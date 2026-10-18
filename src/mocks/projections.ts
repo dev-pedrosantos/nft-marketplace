@@ -25,6 +25,7 @@ export function toNft(record: NftRecord): Nft {
     priceEth: inventoryOf(record.id).priceEth,
     previousPriceEth: record.previousPriceEth,
     isRare: record.isRare,
+    version: inventoryOf(record.id).version,
   }
 }
 
@@ -58,7 +59,6 @@ export function toNftDetails(record: NftRecord): NftDetails {
       available: inventory.available[edition.id],
     })),
     defaultEditionId: record.defaultEditionId,
-    version: inventory.version,
   }
 }
 

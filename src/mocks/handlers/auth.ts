@@ -102,6 +102,8 @@ export const authHandlers: HttpHandler[] = [
   http.post(api('/auth/logout'), async ({ request }) => {
     await latency()
     const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+    const ended = db.sessions.find((session) => session.token === token)
+    if (ended) delete db.walletConnections[ended.userId]
     db.sessions = db.sessions.filter((session) => session.token !== token)
     commit()
     return new HttpResponse(null, { status: 204 })

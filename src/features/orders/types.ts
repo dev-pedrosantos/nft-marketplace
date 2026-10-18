@@ -48,6 +48,8 @@ export interface Order {
   walletAddress: string
   transactionHash: string | null
   failureReason: string | null
+  /** Bumped on every status change; realtime events at or below it are stale. */
+  version: number
 }
 
 export type QuoteChangeType = 'price' | 'availability' | 'coupon' | 'fee'
@@ -88,4 +90,5 @@ export interface OrderUpdate {
   id: string
   status: OrderStatus
   updatedAt: string
+  version: number
 }

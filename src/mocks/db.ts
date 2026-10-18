@@ -1,7 +1,7 @@
 import type { User } from '@/features/auth/types'
 import type { EditionId, NftUpdate } from '@/features/nfts/types'
 import type { CheckoutQuote, Order } from '@/features/orders/types'
-import type { Wallet } from '@/features/wallets/types'
+import type { Wallet, WalletConnection } from '@/features/wallets/types'
 import type { DecimalString } from '@/lib/money'
 import { nftSeed, type NftRecord } from './data/nfts'
 import { broadcastNftUpdate } from './realtime'
@@ -49,6 +49,8 @@ export interface Reservation {
 export interface OrderRecord extends Order {
   userId: string
   idempotencyKey: string
+  /** Hash of the request body; reusing the key with a different body is a conflict. */
+  requestFingerprint: string
   settleAt: number
   outcome: 'confirmed' | 'failed'
   reservations: Reservation[]
@@ -69,13 +71,15 @@ interface DbState {
   carts: Record<string, CartRecord>
   favorites: Record<string, string[]>
   wallets: Record<string, Wallet[]>
+  /** Keyed by user id. */
+  walletConnections: Record<string, WalletConnection>
   orders: OrderRecord[]
   quotes: Record<string, QuoteRecord>
   inventory: Record<string, InventoryRecord>
 }
 
 const STORAGE_KEY = 'kurio.mock-db'
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 export const SESSION_TTL_MS = 30 * 60 * 1000
 
 export const DEMO_USER_ID = 'user-demo'
@@ -169,6 +173,7 @@ function seed(): DbState {
         },
       ],
     },
+    walletConnections: {},
     orders: [],
     quotes: {},
     inventory: seedInventory(),

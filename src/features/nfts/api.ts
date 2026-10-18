@@ -3,8 +3,8 @@ import { apiClient } from '@/lib/api/client'
 import type { Paginated } from '@/types/api'
 import type { CatalogFilters, FeaturedNft, Nft, NftDetails, NftListParams } from './types'
 
-export async function getNfts(params: NftListParams) {
-  const { data } = await apiClient.get<Paginated<Nft>>('/nfts', { params })
+export async function getNfts(params: NftListParams, signal?: AbortSignal) {
+  const { data } = await apiClient.get<Paginated<Nft>>('/nfts', { params, signal })
   return data
 }
 
@@ -18,24 +18,27 @@ export async function getCatalogFilters() {
   return data
 }
 
-export async function getNft(id: string) {
-  const { data } = await apiClient.get<NftDetails>(`/nfts/${encodeURIComponent(id)}`)
+export async function getNft(id: string, signal?: AbortSignal) {
+  const { data } = await apiClient.get<NftDetails>(`/nfts/${encodeURIComponent(id)}`, { signal })
   return data
 }
 
-export async function getRelatedNfts(id: string, limit: number) {
+export async function getRelatedNfts(id: string, limit: number, signal?: AbortSignal) {
   const { data } = await apiClient.get<Nft[]>(`/nfts/${encodeURIComponent(id)}/related`, {
     params: { limit },
+    signal,
   })
   return data
 }
 
+// Catalog queries forward the abort signal: when filters or the NFT change, the request
+// for the previous ones is cancelled instead of finishing in the background.
 export const nftQueries = {
   all: () => ['nfts'] as const,
   list: (params: NftListParams) =>
     queryOptions({
       queryKey: ['nfts', 'list', params],
-      queryFn: () => getNfts(params),
+      queryFn: ({ signal }) => getNfts(params, signal),
       placeholderData: keepPreviousData,
     }),
   featured: () =>
@@ -51,13 +54,13 @@ export const nftQueries = {
   detail: (id: string) =>
     queryOptions({
       queryKey: ['nfts', 'detail', id],
-      queryFn: () => getNft(id),
+      queryFn: ({ signal }) => getNft(id, signal),
       // Price and stock change concurrently; realtime events patch it in between.
       staleTime: 15_000,
     }),
   related: (id: string, limit = 5) =>
     queryOptions({
       queryKey: ['nfts', 'related', id, limit],
-      queryFn: () => getRelatedNfts(id, limit),
+      queryFn: ({ signal }) => getRelatedNfts(id, limit, signal),
     }),
 }

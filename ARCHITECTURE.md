@@ -1,7 +1,7 @@
 # Arquitetura
 
 Este documento descreve como o frontend do Kurio está organizado e por que algumas decisões foram
-tomadas. Para instalação, contas de demonstração e cenários do mock, veja o [README](../README.md).
+tomadas. Para instalação, contas de demonstração e cenários do mock, veja o [README](README.md).
 
 ## Visão geral
 
@@ -47,11 +47,16 @@ O TanStack Query é a única fonte de dados do servidor. Não há store global p
   cache de uma conta nunca é servido para outra. Quando a sessão muda, o `SessionSync` remove as
   queries da conta anterior (`USER_SCOPED_QUERY_ROOTS`) e invalida o carrinho.
 - **Padrões:** `staleTime` de 60 s, sem refetch no foco e até 2 novas tentativas automáticas,
-  exceto para erros 4xx.
+  exceto para erros 4xx (um 429 não é repetido sozinho; a tela oferece "Tentar novamente").
+- **Cancelamento:** as queries do catálogo repassam o `signal` do TanStack Query ao Axios. Ao trocar
+  filtros, aba ou NFT, a requisição anterior é abortada; e como cada combinação tem a própria
+  chave, uma resposta atrasada nunca substitui a lista da escolha atual.
 - **Mutações do carrinho** respondem com o carrinho recalculado, que é gravado direto no cache.
   Enquanto uma linha está sendo atualizada, seus controles ficam desabilitados, o que serializa
   as alterações da mesma linha e evita respostas fora de ordem.
-- **Favoritos** usam atualização otimista com rollback em caso de erro.
+- **Favoritos** usam atualização otimista com rollback em caso de erro. Um novo clique no coração
+  é ignorado enquanto a alteração anterior não termina: com respostas fora de ordem, um "remover"
+  poderia ser aplicado antes do "adicionar" e deixar o servidor invertido.
 
 ## Dinheiro
 
@@ -84,6 +89,10 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
    confirmação do novo total.
 2. **Envio (`POST /orders`):** cada tentativa gera um `Idempotency-Key` (`crypto.randomUUID()`).
    A tentativa (chave, cotação e dados do pedido) fica em `sessionStorage['kurio.checkout.attempt']`.
+   O servidor guarda o SHA-256 do corpo junto com a chave: a mesma chave com o mesmo corpo devolve
+   o pedido existente; com outro corpo responde `409 IDEMPOTENCY_KEY_REUSED`. Entre a busca pela
+   chave e a gravação do pedido não há `await`, então duas requisições simultâneas com a mesma
+   chave criam um único pedido.
 3. **Clique duplo:** um `ref` bloqueia envios concorrentes e o botão fica desabilitado durante o envio.
 4. **Resultado incerto** (timeout, falha de rede ou 5xx): a tentativa é mantida e o erro oferece
    "Tentar novamente", que reenvia **a mesma chave**. O servidor devolve o pedido já criado, se
@@ -93,7 +102,13 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
    botão "Verificar compra", que reenvia a tentativa salva (inclusive depois de recarregar a página).
 6. **Erros definitivos** (4xx, como cotação expirada ou estoque insuficiente) descartam a tentativa
    e recarregam o carrinho.
-7. **Pedido pendente:** a página do pedido acompanha o status pelo evento `order.updated` e, como
+7. **Carteira conectada:** escolher o provedor pede a conexão à carteira simulada
+   (`POST /me/wallet-connection`). Enquanto a "aprovação" não chega, o checkout mostra a espera e
+   bloqueia o envio; recusada (cenário `wallet-rejected`), mostra o erro e "Conectar de novo";
+   conectada, mostra o endereço exposto pela carteira e "Desconectar". A conexão vale para a conta
+   (sobrevive a recarregar e termina no logout), e `POST /orders` responde
+   `409 WALLET_NOT_CONNECTED` se o provedor do pedido não estiver conectado.
+8. **Pedido pendente:** a página do pedido acompanha o status pelo evento `order.updated` e, como
    reserva, consulta a API a cada 3 s enquanto o status for `pending`. O `PendingOrderBanner` lista
    pagamentos pendentes em qualquer página. O recibo de confirmação só abre com status
    `confirmed`; pagamentos recusados mostram a tela de falha e liberam as reservas de estoque.
@@ -103,11 +118,20 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
 - `src/lib/realtime/socket.ts` cria um único cliente Socket.IO só com transporte `websocket`
   (o MSW não intercepta o long-polling). `src/app/realtime-sync.tsx` assina os eventos e envia
   `session.identify` com o token, para que `order.updated` chegue só ao dono do pedido.
-- **`nft.updated`** atualiza os detalhes do NFT no cache apenas se `version` for maior que a
-  atual (eventos fora de ordem são descartados), corrige o preço nas listas e nos favoritos e
+- **Identidade e versão:** todo evento traz `eventId` e `occurredAt`, e o recurso traz `version`
+  (NFTs e pedidos têm `version` também nas respostas REST). A entrega é tratada como "pelo menos
+  uma vez, sem ordem": o `RealtimeSync` ignora um `eventId` já visto e um evento cuja versão não
+  seja maior que a última aplicada ao mesmo item. O cache faz a mesma comparação, porque pode já ter
+  uma versão mais nova vinda por HTTP.
+- **`nft.updated`** atualiza preço e estoque nos detalhes e o preço nas listas e nos favoritos, e
   invalida o carrinho, cujos avisos de preço e estoque são calculados pelo servidor. A página de
   detalhes avisa quando o preço muda e limita a quantidade ao novo estoque.
-- **`order.updated`** atualiza o status do pedido e invalida pedidos e carrinho.
+- **`order.updated`** é emitido na criação (`pending`, versão 1) e na liquidação. Atualiza o
+  status do pedido e invalida pedidos e carrinho; `confirmed` e `failed` são finais e nenhum evento
+  tardio os altera.
+- **Reconexão:** eventos emitidos com o socket fora do ar não são reenviados. No `reconnect` do
+  Socket.IO, o app invalida NFTs, carrinho, pedidos e favoritos para reconciliar com a API, e
+  reenvia `session.identify`.
 - O `main.tsx` só importa a aplicação **depois** de iniciar o MSW, porque o `engine.io-client`
   captura o construtor `WebSocket` quando o módulo é avaliado; com import estático, o cliente
   ficaria com o WebSocket nativo e nunca alcançaria o mock.
@@ -125,7 +149,14 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
   2,5 s ele é liquidado como `confirmed` (ou `failed` no cenário `payment-failure`) e o servidor
   emite `order.updated`.
 - **`src/mocks/scenarios.ts`** e **`src/mocks/devtools.ts`:** cenários de falha e o objeto
-  `window.__kurioMock`, usados manualmente e pelos testes E2E.
+  `window.__kurioMock`, usados manualmente e pelos testes E2E. Os cenários globais (`offline`,
+  `http-500`, `http-429`) respondem num handler que vem antes de todas as rotas; latência variável e
+  respostas fora de ordem ficam em `latency()`. No `offline`, o socket aberto é fechado e cada nova
+  tentativa falha com `error`, como um servidor inalcançável (um fechamento antes do handshake
+  deixaria o Socket.IO parado, sem tentar de novo).
+- **`src/mocks/realtime.ts`:** publica os eventos com `eventId`, guarda os 100 últimos para
+  `redeliverEvent` e, no cenário `unreliable-events`, entrega cada evento duas vezes seguido do
+  anterior do mesmo item.
 - O `main.tsx` testa `import.meta.env.VITE_ENABLE_MOCKS` diretamente, para que um build sem mocks
   descarte todo o código do MSW.
 
@@ -201,6 +232,9 @@ throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
 - O checkout vem preenchido com a carteira principal (o Figma mostra os campos vazios) e o provedor
   de pagamento começa sem seleção (o Figma mostra Coinbase marcado), para que a escolha seja explícita.
 - No checkout, o nome ENS tem um campo de texto além do seletor `.eth` do Figma, porque a validação exige o nome.
+- O Figma não tem estados de conexão da carteira. No checkout, uma linha abaixo dos provedores mostra
+  a espera pela aprovação, a carteira conectada com o endereço e "Desconectar", ou a recusa com
+  "Conectar de novo"; sem provedor escolhido ela não ocupa espaço, então a tela inicial segue o frame.
 - No carrinho mobile, o Figma mostra a lixeira em um único item, sobreposta ao botão "+"; no app ela
   fica no canto de cada item, sem cobrir o controle de quantidade.
 - Os frames de Perfil e Carteiras do Figma terminam sem rodapé; no app essas telas usam o mesmo

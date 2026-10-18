@@ -16,7 +16,7 @@ os desvios do Figma e as limitações estão em [`ARCHITECTURE.md`](ARCHITECTURE
 | `/` | Home e catálogo | Busca, abas, filtros (coleção, rede, faixa de preço), ordenação e paginação, todos refletidos na URL |
 | `/nfts/:nftId` | Detalhes | Galeria, edição (1/1, 1/10, 1/50, aberta), quantidade limitada ao estoque, favoritos, compra e preço/estoque em tempo real |
 | `/carrinho` | Carrinho | Persistência no servidor (visitante e usuário), cupons, totais calculados pela API, avisos de preço/estoque alterados |
-| `/checkout` | Pagamento | Dados do colecionador, carteira principal/secundária, rede, provedor (WalletConnect, MetaMask, Coinbase), revisão de valores e envio idempotente |
+| `/checkout` | Pagamento | Dados do colecionador, carteira principal/secundária, rede, conexão simulada do provedor (WalletConnect, MetaMask, Coinbase) com recusa e desconexão, revisão de valores e envio idempotente |
 | `/pedidos/:orderId` | Pedido e confirmação | Pendente, recusado ou confirmado; o recibo de confirmação só abre quando o pagamento é confirmado |
 | `/conta/perfil` · `/conta/carteiras` · `/conta/favoritos` · `/conta/pedidos` | Conta | Perfil com avatar, senha, carteiras, favoritos e histórico de pedidos |
 | `?auth=login` · `?auth=signup` | Login e cadastro | Diálogo sobre qualquer tela, validação, sessão persistida, logout e sessão expirada |
@@ -106,8 +106,8 @@ voltar aos dados iniciais, rode `__kurioMock.reset()` no console ou limpe o `loc
 | Autenticação | `POST /auth/login`, `POST /auth/register`, `POST /auth/logout`, `GET /auth/me` |
 | Catálogo | `GET /nfts?tab&sort&page&search&collection&network&minPrice&maxPrice`, `GET /nfts/featured`, `GET /nfts/:id`, `GET /nfts/:id/related`, `GET /catalog/filters` |
 | Carrinho | `GET /cart?network`, `GET /cart/summary`, `POST /cart/items`, `PATCH /cart/items/:lineId`, `DELETE /cart/items/:lineId`, `POST /cart/items/:lineId/accept-price`, `POST /cart/coupon`, `DELETE /cart/coupon` |
-| Checkout e pedidos | `POST /checkout/quote`, `POST /orders` (exige `Idempotency-Key`), `GET /orders`, `GET /orders/:id` |
-| Conta | `PUT /me/profile`, `PUT /me/password`, `PUT /me/avatar`, `DELETE /me/avatar`, `GET/POST /me/wallets`, `PUT/DELETE /me/wallets/:id`, `GET /me/favorites`, `PUT/DELETE /me/favorites/:nftId` |
+| Checkout e pedidos | `POST /checkout/quote`, `POST /orders` (exige `Idempotency-Key` e carteira conectada), `GET /orders`, `GET /orders/:id` |
+| Conta | `PUT /me/profile`, `PUT /me/password`, `PUT /me/avatar`, `DELETE /me/avatar`, `GET/POST /me/wallets`, `PUT/DELETE /me/wallets/:id`, `GET/POST/DELETE /me/wallet-connection`, `GET /me/favorites`, `PUT/DELETE /me/favorites/:nftId` |
 | Conteúdo | `GET /promotions`, `GET /posts`, `POST /newsletter/subscriptions` |
 
 Rotas autenticadas usam `Authorization: Bearer <token>`. O carrinho de visitante é identificado
@@ -117,9 +117,11 @@ por `X-Guest-Id` e é mesclado ao carrinho da conta no login.
 
 | Evento | Direção | Conteúdo |
 | --- | --- | --- |
-| `nft.updated` | servidor → cliente | Preço e estoque por edição, com `version` para descartar eventos fora de ordem |
-| `order.updated` | servidor → cliente | Mudança de status de um pedido; só chega ao dono da sessão |
+| `nft.updated` | servidor → cliente | Preço e estoque por edição, com `version` |
+| `order.updated` | servidor → cliente | Criação e mudança de status de um pedido, com `version`; só chega ao dono da sessão |
 | `session.identify` | cliente → servidor | Associa a conexão ao token da sessão |
+
+Todo evento do servidor leva `eventId` (repetido quando o evento é reentregue) e `occurredAt`.
 
 ### Cenários de falha
 
@@ -136,10 +138,18 @@ vírgulas em `localStorage['kurio.mock.scenarios']` antes de carregar a página.
 | `server-error` | A próxima criação de pedido falha com 503 (uso único) |
 | `live-market` | Publica mudanças aleatórias de preço e estoque a cada poucos segundos |
 | `no-latency` | Remove a latência artificial de 250 ms |
+| `variable-latency` | Cada requisição espera entre 300 e 1500 ms |
+| `out-of-order` | Uma requisição que chega enquanto outras esperam responde 500 ms antes delas, então as respostas voltam fora de ordem |
+| `offline` | As requisições falham como se não houvesse rede e o socket cai e não reconecta enquanto o cenário estiver ligado |
+| `http-500` | Toda requisição à API responde 500 |
+| `http-429` | Toda requisição à API responde 429 com `Retry-After` |
+| `favorites-failure` | Adicionar ou remover favoritos falha com 500 |
+| `unreliable-events` | Cada evento em tempo real chega duas vezes, seguido do evento anterior do mesmo item |
+| `wallet-rejected` | A carteira recusa os pedidos de conexão |
 
 Outros utilitários do console: `__kurioMock.active()`, `disable(cenário)`, `reset()`,
-`expireSessions()`, `setPrice(nftId, '1.50')`, `setAvailability(nftId, '1-10', 0)` e
-`realtimeClients()`.
+`expireSessions()`, `setPrice(nftId, '1.50')`, `setAvailability(nftId, '1-10', 0)`,
+`realtimeClients()` e `redeliverEvent(eventId)` (reenvia um evento já publicado, com o mesmo id).
 
 ## Build de produção e deploy
 
@@ -174,11 +184,12 @@ iniciais, com o cenário `no-latency` ligado.
 | Spec | Cobertura |
 | --- | --- |
 | `catalog.spec.ts` | Busca, estado vazio, ordenação por preço, paginação e abas na URL |
-| `details.spec.ts` | Edição, limite de quantidade pelo estoque, compra, edição esgotada, favoritos com login, preço e estoque via socket |
+| `details.spec.ts` | Edição, limite de quantidade pelo estoque, compra, edição esgotada, favoritos com login, rollback quando favoritar falha, preço e estoque via socket, eventos duplicados e fora de ordem, reconciliação após reconexão |
 | `auth.spec.ts` | Validação, credenciais inválidas, sessão após reload, logout, rota privada, sessão expirada, cadastro e isolamento entre usuários |
 | `cart.spec.ts` | Totais, cupons válidos/inválidos/expirados, quantidade, remoção, persistência e carrinho de visitante até o checkout |
-| `checkout.spec.ts` | Compra com clique duplo sem pedido duplicado, pagamento recusado, mudança de preço, timeout com recuperação idempotente e erro 503 com nova tentativa |
-| `orders-realtime.spec.ts` | `order.updated` recebido pelo socket do dono, evento de outro usuário não entregue à sessão atual, banner de pagamento pendente após sair da página e recarregar |
+| `checkout.spec.ts` | Compra com clique duplo sem pedido duplicado, pagamento recusado, mudança de preço, timeout com recuperação idempotente, erro 503 com nova tentativa, conexão da carteira (recusa, nova tentativa, persistência, troca e desconexão) e, direto na API, pedido sem carteira, chave reutilizada com outro conteúdo (409) e requisições simultâneas com a mesma chave |
+| `orders-realtime.spec.ts` | `order.updated` recebido pelo socket do dono com versão, evento atrasado ou repetido sem tirar o pedido do status final, evento de outro usuário não entregue à sessão atual, banner de pagamento pendente após sair da página e recarregar |
+| `api-scenarios.spec.ts` | Offline com recuperação automática quando a conexão volta, erro 500 com novas tentativas automáticas e botão de nova tentativa, erro 429 sem repetição, respostas fora de ordem e skeleton com latência variável |
 | `accessibility.spec.ts` | Foco preso no diálogo, Escape, foco visível e `prefers-reduced-motion` |
 | `footer.spec.ts` | Coleções do rodapé filtrando o catálogo, links da conta com e sem sessão, e-mail e telefone |
 | `coming-soon.spec.ts` | Aviso "Em breve" nos itens sem destino do header e do rodapé: abre no clique (não no hover), fecha pelo X, por Esc e clicando fora, fica centralizado e devolve o foco |

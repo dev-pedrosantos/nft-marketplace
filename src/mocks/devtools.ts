@@ -1,7 +1,7 @@
 import type { EditionId } from '@/features/nfts/types'
 import type { DecimalString } from '@/lib/money'
 import { commit, db, resetDb, updateInventory } from './db'
-import { realtimeClientCount } from './realtime'
+import { dropRealtimeConnections, realtimeClientCount, redeliverEvent } from './realtime'
 import {
   activeScenarios,
   disableScenario,
@@ -17,7 +17,10 @@ import {
 export const mockDevtools = {
   scenarios: MOCK_SCENARIOS,
   active: activeScenarios,
-  enable: (scenario: MockScenario) => enableScenario(scenario),
+  enable: (scenario: MockScenario) => {
+    enableScenario(scenario)
+    if (scenario === 'offline') dropRealtimeConnections()
+  },
   disable: (scenario: MockScenario) => disableScenario(scenario),
   /** Restores the seed data (users, carts, stock, orders). */
   reset: () => resetDb(),
@@ -33,6 +36,8 @@ export const mockDevtools = {
     updateInventory(nftId, { available: { [editionId]: available } }),
   /** Open Socket.IO connections; tests wait for one before simulating realtime events. */
   realtimeClients: () => realtimeClientCount(),
+  /** Sends a past realtime event again with the same `eventId` (duplicate or late delivery). */
+  redeliverEvent: (eventId: string) => redeliverEvent(eventId),
 }
 
 declare global {

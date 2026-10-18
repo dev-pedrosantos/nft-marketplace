@@ -1,4 +1,13 @@
-import { authDialog, expect, login, submitLogin, test, waitForRealtime } from './support.ts'
+import {
+  authDialog,
+  disableScenario,
+  enableScenario,
+  expect,
+  login,
+  submitLogin,
+  test,
+  waitForRealtime,
+} from './support.ts'
 
 const NFT = 'Emerald Ape #042'
 
@@ -54,6 +63,26 @@ test.describe('detalhes do NFT', () => {
     await page.goto('/conta/favoritos')
     await expect(page.getByText(NFT).first()).toBeVisible()
   })
+
+  test('falha ao favoritar desfaz a marcação e avisa', async ({ page, isMobile }) => {
+    await login(page)
+    await page.goto('/nfts/emerald-ape-042')
+    await enableScenario(page, 'favorites-failure')
+    // With the default latency the optimistic state is visible before the error arrives.
+    await disableScenario(page, 'no-latency')
+
+    const favorited = isMobile ? 'Remover dos favoritos' : 'Favoritado'
+    await page.getByRole('button', { name: 'Favoritar', exact: true }).filter({ visible: true }).click()
+    await expect(page.getByRole('button', { name: favorited }).filter({ visible: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Favoritar', exact: true }).filter({ visible: true })).toBeVisible()
+    await expect(
+      page.getByText('Não foi possível atualizar os favoritos agora. Tente novamente.').filter({ visible: true }),
+    ).toBeVisible()
+
+    await page.goto('/conta/favoritos')
+    await expect(page.getByText('Neon Vessel #552').first()).toBeVisible()
+    await expect(page.getByText(NFT)).toHaveCount(0)
+  })
 })
 
 test.describe('tempo real', () => {
@@ -78,5 +107,47 @@ test.describe('tempo real', () => {
     await expect(editions.getByRole('radio', { name: '1/10 (esgotada)', exact: true })).toBeDisabled()
     const buy = page.getByRole('button', { name: isMobile ? 'Esgotado' : 'ESGOTADO', exact: true }).filter({ visible: true })
     await expect(buy).toBeDisabled()
+  })
+
+  test('eventos duplicados e fora de ordem não revertem o preço', async ({ page }) => {
+    await page.goto('/nfts/emerald-ape-042')
+    await waitForRealtime(page)
+    await enableScenario(page, 'unreliable-events')
+    await page.evaluate(async () => {
+      const modulePath = '/src/lib/realtime/socket.ts'
+      const { getSocket } = await import(/* @vite-ignore */ modulePath)
+      const events: unknown[] = []
+      ;(window as unknown as { __nftEvents: unknown[] }).__nftEvents = events
+      getSocket().on('nft.updated', (update: unknown) => events.push(update))
+    })
+    const received = () => page.evaluate(() => (window as unknown as { __nftEvents: unknown[] }).__nftEvents.length)
+
+    await page.evaluate(() => window.__kurioMock!.setPrice('emerald-ape-042', '1.50'))
+    // The first change arrives twice.
+    await expect.poll(received).toBe(2)
+    await page.evaluate(() => window.__kurioMock!.setPrice('emerald-ape-042', '1.80'))
+    // The second arrives twice, followed by the first one again.
+    await expect.poll(received).toBe(5)
+
+    await expect(page.getByText('1.80 ETH', { exact: true }).filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByText('O preço foi atualizado de 1.50 ETH para 1.80 ETH.').filter({ visible: true })).toBeVisible()
+  })
+
+  test('reconexão do socket recupera a mudança perdida enquanto estava offline', async ({ page }) => {
+    await page.goto('/nfts/emerald-ape-042')
+    const price = (value: string) => page.getByText(value, { exact: true }).filter({ visible: true }).first()
+    await expect(price('1.19 ETH')).toBeVisible()
+    await waitForRealtime(page)
+
+    await enableScenario(page, 'offline')
+    await expect.poll(() => page.evaluate(() => window.__kurioMock!.realtimeClients())).toBe(0)
+    // Nobody is connected to receive this event.
+    await page.evaluate(() => window.__kurioMock!.setPrice('emerald-ape-042', '2.25'))
+    await page.waitForTimeout(500)
+    await expect(page.getByText('2.25 ETH', { exact: true }).filter({ visible: true })).toHaveCount(0)
+
+    await disableScenario(page, 'offline')
+    await expect(price('2.25 ETH')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('O preço foi atualizado de 1.19 ETH para 2.25 ETH.').filter({ visible: true })).toBeVisible()
   })
 })

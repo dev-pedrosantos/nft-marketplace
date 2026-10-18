@@ -20,6 +20,22 @@ export const MOCK_SCENARIOS = [
   'live-market',
   /** Removes the artificial network latency. */
   'no-latency',
+  /** Each request waits a random 300–1500 ms. */
+  'variable-latency',
+  /** A request that arrives while others wait answers before them, so responses come back out of order. */
+  'out-of-order',
+  /** API requests fail as if there were no connection and the socket drops until it is turned off. */
+  'offline',
+  /** Every API request answers 500. */
+  'http-500',
+  /** Every API request answers 429. */
+  'http-429',
+  /** Adding or removing favorites fails with 500. */
+  'favorites-failure',
+  /** Every realtime event is delivered twice, followed by the previous event of the same item. */
+  'unreliable-events',
+  /** The wallet refuses connection requests. */
+  'wallet-rejected',
 ] as const
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number]

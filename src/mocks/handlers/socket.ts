@@ -26,7 +26,7 @@ function keepAlive({ client }: WebSocketHandlerConnection) {
     () => client.send(ENGINE_IO_PING_PACKET),
     ENGINE_IO_PING_INTERVAL_MS,
   )
-  client.addEventListener('close', () => clearInterval(timer))
+  return () => clearInterval(timer)
 }
 
 /** "Other collectors" buying or repricing the design NFTs while the scenario is on. */
@@ -53,14 +53,32 @@ export const socketLink = ws.link(toWebSocketUrl(env.socketUrl))
 
 export const socketHandlers = [
   socketLink.addEventListener('connection', (connection) => {
-    keepAlive(connection)
+    // Offline: the connection fails like an unreachable server. Socket.IO only schedules the
+    // next attempt after an `error`; a bare close before the handshake leaves it waiting forever.
+    if (isScenarioActive('offline')) {
+      // Typed as a protocol, the connection still carries the mocked WebSocket at runtime.
+      const { client } = connection
+      if ('socket' in client && client.socket instanceof EventTarget) client.socket.dispatchEvent(new Event('error'))
+      client.close()
+      return
+    }
+    const stopKeepAlive = keepAlive(connection)
     const io = toSocketIo(connection)
+    // `close` events only fire when the browser side closes, so a server-side close cleans up too.
+    const dispose = () => {
+      stopKeepAlive()
+      unregister()
+    }
     const client = {
       userId: null as string | null,
       emit: (event: string, ...data: unknown[]) => io.client.emit(event, ...data),
+      close: () => {
+        connection.client.close()
+        dispose()
+      },
     }
     const unregister = registerRealtimeClient(client)
-    connection.client.addEventListener('close', unregister)
+    connection.client.addEventListener('close', dispose)
 
     io.client.on('session.identify', (_event, token: string | null) => {
       const auth = findUserByToken(token)

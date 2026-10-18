@@ -1,9 +1,16 @@
-import { http, HttpResponse, type HttpHandler } from 'msw'
+import { delay, http, HttpResponse, type HttpHandler } from 'msw'
 import type { PasswordChangeInput, ProfileInput } from '@/features/profile/types'
-import type { Wallet, WalletInput, WalletRole } from '@/features/wallets/types'
+import {
+  WALLET_PROVIDERS,
+  type Wallet,
+  type WalletConnection,
+  type WalletInput,
+  type WalletRole,
+} from '@/features/wallets/types'
 import { validatePasswordChange, validateProfile, validateWallet } from '@/lib/validation'
-import { commit, createId, db, findNft } from '../db'
+import { commit, createId, db, findNft, randomHex } from '../db'
 import { toNft } from '../projections'
+import { isScenarioActive } from '../scenarios'
 import {
   api,
   errorResponse,
@@ -13,6 +20,9 @@ import {
   requireUser,
   validationError,
 } from './utils'
+
+/** Time the collector takes to approve the request in the (simulated) wallet. */
+const WALLET_APPROVAL_MS = 800
 
 const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 /** Data URLs are ~4/3 of the file size; this keeps uploads around 1 MB. */
@@ -35,6 +45,10 @@ function pickWallet(body: Partial<WalletInput>): WalletInput {
   return Object.fromEntries(
     WALLET_FIELDS.map((field) => [field, String(body[field] ?? '').trim()]),
   ) as unknown as WalletInput
+}
+
+function favoritesFailure() {
+  return errorResponse(500, 'FAVORITES_UNAVAILABLE', 'Não foi possível atualizar os favoritos agora. Tente novamente.')
 }
 
 function walletsOf(userId: string) {
@@ -183,6 +197,46 @@ export const accountHandlers: HttpHandler[] = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  http.get(api('/me/wallet-connection'), async ({ request }) => {
+    await latency()
+    const viewer = requireUser(request)
+    if (viewer instanceof Response) return viewer
+    return HttpResponse.json(db.walletConnections[viewer.user.id] ?? null)
+  }),
+
+  http.post(api('/me/wallet-connection'), async ({ request }) => {
+    await latency()
+    const viewer = requireUser(request)
+    if (viewer instanceof Response) return viewer
+    const body = await readJson<{ provider: string }>(request)
+    const provider = WALLET_PROVIDERS.find((item) => item.id === body.provider)
+    if (!provider) return errorResponse(422, 'VALIDATION_ERROR', 'Selecione uma carteira.')
+
+    await delay(isScenarioActive('no-latency') ? 0 : WALLET_APPROVAL_MS)
+    if (isScenarioActive('wallet-rejected')) {
+      return errorResponse(403, 'WALLET_REJECTED', `A conexão foi recusada na carteira ${provider.label}.`)
+    }
+    // The wallet exposes the collector's primary account, like an extension would.
+    const primary = walletsOf(viewer.user.id).find((wallet) => wallet.role === 'primary')
+    const connection: WalletConnection = {
+      provider: provider.id,
+      address: primary?.address ?? randomHex(20),
+      connectedAt: new Date().toISOString(),
+    }
+    db.walletConnections[viewer.user.id] = connection
+    commit()
+    return HttpResponse.json(connection)
+  }),
+
+  http.delete(api('/me/wallet-connection'), async ({ request }) => {
+    await latency()
+    const viewer = requireUser(request)
+    if (viewer instanceof Response) return viewer
+    delete db.walletConnections[viewer.user.id]
+    commit()
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   http.get(api('/me/favorites'), async ({ request }) => {
     await latency()
     const viewer = requireUser(request)
@@ -196,6 +250,7 @@ export const accountHandlers: HttpHandler[] = [
     await latency()
     const viewer = requireUser(request)
     if (viewer instanceof Response) return viewer
+    if (isScenarioActive('favorites-failure')) return favoritesFailure()
     const nftId = String(params.nftId)
     if (!findNft(nftId)) return errorResponse(404, 'NFT_NOT_FOUND', 'NFT não encontrado.')
     const favorites = (db.favorites[viewer.user.id] ??= [])
@@ -208,6 +263,7 @@ export const accountHandlers: HttpHandler[] = [
     await latency()
     const viewer = requireUser(request)
     if (viewer instanceof Response) return viewer
+    if (isScenarioActive('favorites-failure')) return favoritesFailure()
     db.favorites[viewer.user.id] = (db.favorites[viewer.user.id] ?? []).filter(
       (id) => id !== params.nftId,
     )

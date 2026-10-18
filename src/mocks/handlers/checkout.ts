@@ -17,7 +17,7 @@ import {
 import { notifyOrderUpdate } from '../realtime'
 import { consumeScenario, isScenarioActive } from '../scenarios'
 import { computeCart, networkOf, toOrderLines } from '../projections'
-import { api, errorResponse, latency, readJson, requireUser, validationError } from './utils'
+import { api, errorResponse, fingerprint, latency, readJson, requireUser, validationError } from './utils'
 
 const QUOTE_TTL_MS = 5 * 60 * 1000
 const PAYMENT_SETTLE_MS = 2500
@@ -34,6 +34,7 @@ function publicOrder(order: OrderRecord): Order {
   const {
     userId: _userId,
     idempotencyKey: _key,
+    requestFingerprint: _fingerprint,
     settleAt: _settleAt,
     outcome: _outcome,
     reservations: _reservations,
@@ -71,8 +72,13 @@ function settle(order: OrderRecord) {
   }
 
   order.updatedAt = now
+  order.version += 1
   commit()
-  notifyOrderUpdate(order.userId, { id: order.id, status: order.status, updatedAt: now })
+  notifyOrderUpdate(order.userId, toOrderUpdate(order))
+}
+
+function toOrderUpdate(order: OrderRecord) {
+  return { id: order.id, status: order.status, updatedAt: order.updatedAt, version: order.version }
 }
 
 function schedule(order: OrderRecord) {
@@ -183,22 +189,38 @@ export const checkoutHandlers: HttpHandler[] = [
     if (!idempotencyKey) {
       return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Cabeçalho Idempotency-Key ausente.')
     }
-    // A retry (double click, timeout, reload) returns the order created the first time.
+    const body = await readJson<PlaceOrderInput>(request)
+    const requestFingerprint = await fingerprint(body)
+
+    // No `await` from here until the order is stored: concurrent requests with the same key
+    // cannot both get past this lookup.
     const existing = db.orders.find(
       (order) => order.userId === viewer.user.id && order.idempotencyKey === idempotencyKey,
     )
-    if (existing) return HttpResponse.json(publicOrder(existing))
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        return errorResponse(
+          409,
+          'IDEMPOTENCY_KEY_REUSED',
+          'Esta tentativa de pagamento já foi usada com outros dados. Revise o pedido e confirme de novo.',
+        )
+      }
+      // A retry (double click, timeout, reload) returns the order created the first time.
+      return HttpResponse.json(publicOrder(existing))
+    }
 
     if (consumeScenario('server-error')) {
       return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Serviço de pagamento indisponível. Tente novamente.')
     }
 
-    const body = await readJson<PlaceOrderInput>(request)
     const collector = body.collector ?? ({} as PlaceOrderInput['collector'])
     const invalid = validationError(validateCollector(collector))
     if (invalid) return invalid
     const provider = WALLET_PROVIDERS.find((item) => item.id === body.walletProvider)
     if (!provider) return errorResponse(422, 'VALIDATION_ERROR', 'Selecione uma carteira.')
+    if (db.walletConnections[viewer.user.id]?.provider !== provider.id) {
+      return errorResponse(409, 'WALLET_NOT_CONNECTED', `Conecte a carteira ${provider.label} para pagar.`)
+    }
 
     const stored = body.quoteId ? db.quotes[body.quoteId] : undefined
     if (!stored || stored.userId !== viewer.user.id) {
@@ -241,8 +263,10 @@ export const checkoutHandlers: HttpHandler[] = [
       walletAddress: collector.walletAddress.trim(),
       transactionHash: null,
       failureReason: null,
+      version: 1,
       userId: viewer.user.id,
       idempotencyKey,
+      requestFingerprint,
       settleAt: now + (isScenarioActive('payment-timeout') ? SLOW_PAYMENT_SETTLE_MS : PAYMENT_SETTLE_MS),
       outcome: isScenarioActive('payment-failure') ? 'failed' : 'confirmed',
       reservations: stored.quote.items.map(({ nftId, editionId, quantity }) => ({ nftId, editionId, quantity })),
@@ -251,6 +275,7 @@ export const checkoutHandlers: HttpHandler[] = [
     db.orders.push(order)
     commit()
     schedule(order)
+    notifyOrderUpdate(order.userId, toOrderUpdate(order))
 
     if (consumeScenario('slow-order')) await delay(SLOW_ORDER_RESPONSE_MS)
     return HttpResponse.json(publicOrder(order), { status: 201 })

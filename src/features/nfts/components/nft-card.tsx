@@ -82,6 +82,8 @@ function FavoriteButton({ nft }: { nft: Nft }) {
       })
       return
     }
+    // One toggle at a time: responses can arrive out of order and leave the server inverted.
+    if (toggle.isPending) return
     toggle.mutate({ nft, favorite: !isFavorite })
   }
 

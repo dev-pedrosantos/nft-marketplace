@@ -116,7 +116,8 @@ function NftDetailsView({ nft }: { nft: NftDetails }) {
   }
 
   const onFavorite = () => {
-    if (!requireSession()) return
+    // One toggle at a time: responses can arrive out of order and leave the server inverted.
+    if (!requireSession() || toggleFavorite.isPending) return
     toggleFavorite.mutate(
       { nft, favorite: !isFavorite },
       { onError: (error) => setNotice({ tone: 'error', text: errorMessage(error, 'Não foi possível atualizar os favoritos.') }) },

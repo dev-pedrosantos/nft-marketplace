@@ -1,12 +1,29 @@
 import { http, HttpResponse, type HttpHandler } from 'msw'
 import { posts } from '../data/posts'
 import { promotions } from '../data/promotions'
+import { isScenarioActive } from '../scenarios'
 import { accountHandlers } from './account'
 import { authHandlers } from './auth'
 import { cartHandlers } from './cart'
 import { catalogHandlers } from './catalog'
 import { checkoutHandlers } from './checkout'
-import { api, latency } from './utils'
+import { api, errorResponse, latency, type ApiErrorBody } from './utils'
+
+const RETRY_AFTER_SECONDS = 5
+
+// Answers before every route while a global failure scenario is on; otherwise falls through.
+const failureScenarios = http.all(api('/*'), () => {
+  if (isScenarioActive('offline')) return HttpResponse.error()
+  if (isScenarioActive('http-500')) {
+    return errorResponse(500, 'INTERNAL_ERROR', 'Erro interno do servidor. Tente novamente em instantes.')
+  }
+  if (isScenarioActive('http-429')) {
+    return HttpResponse.json<ApiErrorBody>(
+      { code: 'RATE_LIMITED', message: 'Muitas requisições em pouco tempo. Aguarde alguns segundos e tente novamente.' },
+      { status: 429, headers: { 'Retry-After': String(RETRY_AFTER_SECONDS) } },
+    )
+  }
+})
 
 // Response fixtures belong in `src/mocks/data`, never inside UI components.
 const contentHandlers: HttpHandler[] = [
@@ -30,6 +47,7 @@ const contentHandlers: HttpHandler[] = [
 ]
 
 export const httpHandlers: HttpHandler[] = [
+  failureScenarios,
   ...catalogHandlers,
   ...authHandlers,
   ...accountHandlers,

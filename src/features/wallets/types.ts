@@ -34,3 +34,10 @@ export interface Wallet extends WalletInput {
   role: WalletRole
   createdAt: string
 }
+
+/** Simulated wallet session that authorizes payments; no real wallet is involved. */
+export interface WalletConnection {
+  provider: WalletProvider
+  address: string
+  connectedAt: string
+}

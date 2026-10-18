@@ -23,8 +23,15 @@ import { PromoCode } from '@/features/cart/components/promo-code'
 import type { Cart } from '@/features/cart/types'
 import { nftQueries } from '@/features/nfts/api'
 import { useCheckout } from '@/features/orders/use-checkout'
-import { useWallets } from '@/features/wallets/api'
-import { WALLET_PROVIDERS, WALLET_TYPES, type Wallet, type WalletProvider, type WalletType } from '@/features/wallets/types'
+import { useConnectWallet, useDisconnectWallet, useWalletConnection, useWallets } from '@/features/wallets/api'
+import {
+  WALLET_PROVIDERS,
+  WALLET_TYPES,
+  type Wallet,
+  type WalletConnection,
+  type WalletProvider,
+  type WalletType,
+} from '@/features/wallets/types'
 import { errorMessage } from '@/lib/api/errors'
 import { formatEth, shortenHash } from '@/lib/format'
 import { hasErrors, useForm } from '@/lib/use-form'
@@ -106,7 +113,13 @@ function CheckoutContent({ user, wallets }: { user: User; wallets: Wallet[] }) {
   const form = useForm<CheckoutValues>(valuesFrom(user, primary))
   const [selectedWalletId, setSelectedWalletId] = useState(primary?.id ?? null)
   const [useOtherWallet, setUseOtherWallet] = useState(false)
-  const [provider, setProvider] = useState<WalletProvider | null>(null)
+  const connection = useWalletConnection()
+  const connectWallet = useConnectWallet()
+  const disconnectWallet = useDisconnectWallet()
+  const [chosenProvider, setChosenProvider] = useState<WalletProvider | null>(null)
+  // A wallet connected earlier stays selected until the collector picks another or disconnects.
+  const provider = chosenProvider ?? connection.data?.provider ?? null
+  const walletConnected = provider !== null && connection.data?.provider === provider
   const [providerError, setProviderError] = useState<string | null>(null)
   const networkId = form.values.networkId || DEFAULT_NETWORK_ID
   const cart = useQuery(cartQueries.detail(viewer, networkId))
@@ -127,13 +140,35 @@ function CheckoutContent({ user, wallets }: { user: User; wallets: Wallet[] }) {
     if (wallet) selectWallet(wallet)
   }
 
+  const selectProvider = (id: WalletProvider) => {
+    // The wallet prompt is already open; a second request could resolve first.
+    if (connectWallet.isPending) return
+    setChosenProvider(id)
+    setProviderError(null)
+    if (connection.data?.provider !== id) connectWallet.mutate(id)
+  }
+
+  const disconnect = () =>
+    disconnectWallet.mutate(undefined, {
+      onSuccess: () => {
+        setChosenProvider(null)
+        connectWallet.reset()
+      },
+    })
+
   const submit = (event?: FormEvent) => {
     event?.preventDefault()
     if (!cart.data) return
     const errors = validateCollector(form.values)
     form.setErrors(errors)
-    setProviderError(provider ? null : 'Selecione uma carteira para pagar.')
-    if (hasErrors(errors) || !provider) return
+    setProviderError(
+      !provider
+        ? 'Selecione uma carteira para pagar.'
+        : !walletConnected
+          ? `Conecte a carteira ${providerLabel(provider)} para pagar.`
+          : null,
+    )
+    if (hasErrors(errors) || !provider || !walletConnected) return
     void checkout.submit({
       networkId,
       expectedTotalEth: cart.data.totalEth,
@@ -203,6 +238,18 @@ function CheckoutContent({ user, wallets }: { user: User; wallets: Wallet[] }) {
       retrying={checkout.submitting}
     />
   )
+  const walletStatus = (
+    <WalletConnectionStatus
+      provider={provider}
+      connection={connection.data ?? null}
+      connecting={connectWallet.isPending}
+      error={connectWallet.isError ? errorMessage(connectWallet.error, 'Não foi possível conectar a carteira.') : null}
+      onRetry={() => provider && connectWallet.mutate(provider)}
+      onDisconnect={disconnect}
+      disconnecting={disconnectWallet.isPending}
+    />
+  )
+  const submitDisabled = checkout.submitting || connectWallet.isPending
 
   return (
     <>
@@ -227,19 +274,17 @@ function CheckoutContent({ user, wallets }: { user: User; wallets: Wallet[] }) {
                   id={option.id}
                   label={option.label}
                   selected={provider === option.id}
-                  onSelect={() => {
-                    setProvider(option.id)
-                    setProviderError(null)
-                  }}
+                  onSelect={() => selectProvider(option.id)}
                 />
               ))}
             </div>
+            {walletStatus}
           </fieldset>
           <div className="mt-3 flex flex-col gap-3">
             {status}
             <button
               type="submit"
-              disabled={checkout.submitting}
+              disabled={submitDisabled}
               aria-busy={checkout.submitting}
               className="h-[45px] w-full rounded-[8px] bg-primary px-4 text-[15px] leading-4 font-bold text-ink disabled:opacity-60"
             >
@@ -255,12 +300,11 @@ function CheckoutContent({ user, wallets }: { user: User; wallets: Wallet[] }) {
         selectedWalletId={selectedWalletId}
         onSelectWallet={selectWallet}
         provider={provider}
-        onSelectProvider={(id) => {
-          setProvider(id)
-          setProviderError(null)
-        }}
+        onSelectProvider={selectProvider}
+        walletStatus={walletStatus}
         status={status}
         submitting={checkout.submitting}
+        submitDisabled={submitDisabled}
         onSubmit={() => submit()}
       />
 
@@ -517,8 +561,10 @@ function MobileCheckout({
   onSelectWallet,
   provider,
   onSelectProvider,
+  walletStatus,
   status,
   submitting,
+  submitDisabled,
   onSubmit,
 }: {
   cart: Cart
@@ -527,8 +573,10 @@ function MobileCheckout({
   onSelectWallet: (wallet: Wallet) => void
   provider: WalletProvider | null
   onSelectProvider: (id: WalletProvider) => void
+  walletStatus: ReactNode
   status: ReactNode
   submitting: boolean
+  submitDisabled: boolean
   onSubmit: () => void
 }) {
   const { data: filters } = useQuery(nftQueries.filters())
@@ -627,6 +675,7 @@ function MobileCheckout({
             )
           })}
         </div>
+        {walletStatus}
       </section>
 
       <p className="flex justify-end gap-7 leading-4 font-bold">
@@ -637,7 +686,7 @@ function MobileCheckout({
       {status}
 
       <div className="fixed inset-x-0 bottom-0 z-30 bg-ink/90 px-7 pt-3 pb-8">
-        <button type="button" onClick={onSubmit} disabled={submitting} aria-busy={submitting} className={GRADIENT_BUTTON}>
+        <button type="button" onClick={onSubmit} disabled={submitDisabled} aria-busy={submitting} className={GRADIENT_BUTTON}>
           {submitting ? 'Processando…' : 'Confirmar compra'}
         </button>
       </div>
@@ -646,6 +695,66 @@ function MobileCheckout({
 }
 
 /* ------------------------------- Shared pieces ------------------------------- */
+
+function providerLabel(id: WalletProvider) {
+  return WALLET_PROVIDERS.find((option) => option.id === id)?.label ?? id
+}
+
+/** Live region that stays in the DOM (hidden while empty) so connection changes are announced. */
+function WalletConnectionStatus({
+  provider,
+  connection,
+  connecting,
+  error,
+  onRetry,
+  onDisconnect,
+  disconnecting,
+}: {
+  provider: WalletProvider | null
+  connection: WalletConnection | null
+  connecting: boolean
+  error: string | null
+  onRetry: () => void
+  onDisconnect: () => void
+  disconnecting: boolean
+}) {
+  const label = provider && providerLabel(provider)
+  return (
+    <div aria-live="polite" className="text-sm leading-5 empty:hidden">
+      {provider && connecting ? (
+        <p className="flex items-center gap-2 text-muted-foreground">
+          <span
+            aria-hidden
+            className="size-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          />
+          Aguardando aprovação na carteira {label}…
+        </p>
+      ) : provider && error ? (
+        <p role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-coral">
+          <span>{error}</span>
+          <button type="button" onClick={onRetry} className="font-bold text-highlight underline">
+            Conectar de novo
+          </button>
+        </p>
+      ) : provider && connection?.provider === provider ? (
+        <p className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span>
+            <span className="font-bold text-highlight">{label} conectada</span>{' '}
+            <span className="text-muted-foreground">· {shortenHash(connection.address)}</span>
+          </span>
+          <button
+            type="button"
+            onClick={onDisconnect}
+            disabled={disconnecting}
+            className="font-bold text-highlight underline disabled:opacity-60"
+          >
+            Desconectar
+          </button>
+        </p>
+      ) : null}
+    </div>
+  )
+}
 
 function CheckoutStatus({
   cart,

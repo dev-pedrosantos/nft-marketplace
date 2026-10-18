@@ -1,5 +1,14 @@
 import type { Page } from '@playwright/test'
-import { disableScenario, enableScenario, expect, login, test } from './support.ts'
+import {
+  connectWallet,
+  disableScenario,
+  enableScenario,
+  expect,
+  login,
+  postOrder,
+  prepareApiPurchase,
+  test,
+} from './support.ts'
 
 function orderCount(page: Page) {
   return page.evaluate(() => {
@@ -25,7 +34,7 @@ test.describe('checkout', () => {
     await submitButton(page).click()
     await expect(page.getByText('Selecione uma carteira para pagar.').filter({ visible: true })).toBeVisible()
 
-    await page.getByRole('radio', { name: 'MetaMask', exact: true }).filter({ visible: true }).click()
+    await connectWallet(page, 'MetaMask')
     await submitButton(page).dblclick()
 
     await expect(page).toHaveURL(/\/pedidos\/[\w-]+$/)
@@ -45,7 +54,7 @@ test.describe('checkout', () => {
     await openCheckout(page)
     await enableScenario(page, 'payment-failure')
 
-    await page.getByRole('radio', { name: 'MetaMask', exact: true }).filter({ visible: true }).click()
+    await connectWallet(page, 'MetaMask')
     await submitButton(page).click()
 
     await expect(page).toHaveURL(/\/pedidos\//)
@@ -60,7 +69,7 @@ test.describe('checkout', () => {
     await openCheckout(page)
     await enableScenario(page, 'price-change')
 
-    await page.getByRole('radio', { name: 'Coinbase Wallet', exact: true }).filter({ visible: true }).click()
+    await connectWallet(page, 'Coinbase Wallet')
     await submitButton(page).click()
 
     const review = page.getByRole('dialog', { name: 'Os valores mudaram' })
@@ -78,7 +87,7 @@ test.describe('checkout', () => {
     await openCheckout(page)
     await enableScenario(page, 'slow-order')
 
-    await page.getByRole('radio', { name: 'MetaMask', exact: true }).filter({ visible: true }).click()
+    await connectWallet(page, 'MetaMask')
     await submitButton(page).click()
 
     await expect(page.getByRole('alert').filter({ hasText: 'O servidor demorou demais para responder.' })).toBeVisible({
@@ -102,7 +111,7 @@ test.describe('checkout', () => {
     await openCheckout(page)
     await enableScenario(page, 'server-error')
 
-    await page.getByRole('radio', { name: 'MetaMask', exact: true }).filter({ visible: true }).click()
+    await connectWallet(page, 'MetaMask')
     await submitButton(page).click()
     const alert = page.getByRole('alert').filter({ hasText: 'Serviço de pagamento indisponível' })
     await expect(alert).toBeVisible()
@@ -111,6 +120,115 @@ test.describe('checkout', () => {
     await disableScenario(page, 'server-error')
     await alert.getByRole('button', { name: 'Tentar novamente' }).click()
     await expect(page.getByRole('dialog', { name: 'Compra confirmada' })).toBeVisible({ timeout: 10_000 })
+    expect(await orderCount(page)).toBe(1)
+  })
+})
+
+test.describe('conexão da carteira', () => {
+  test('recusa bloqueia o pagamento; nova tentativa conecta, persiste e pode ser desfeita', async ({ page }) => {
+    await openCheckout(page)
+    await enableScenario(page, 'wallet-rejected')
+
+    const metaMask = page.getByRole('radio', { name: 'MetaMask', exact: true }).filter({ visible: true })
+    await metaMask.click()
+    const refusal = page
+      .getByRole('alert')
+      .filter({ hasText: 'A conexão foi recusada na carteira MetaMask.' })
+      .filter({ visible: true })
+    await expect(refusal).toBeVisible()
+
+    await submitButton(page).click()
+    await expect(page.getByText('Conecte a carteira MetaMask para pagar.').filter({ visible: true })).toBeVisible()
+    expect(await orderCount(page)).toBe(0)
+
+    await disableScenario(page, 'wallet-rejected')
+    await refusal.getByRole('button', { name: 'Conectar de novo' }).click()
+    const connected = page.getByText('MetaMask conectada').filter({ visible: true })
+    await expect(connected).toBeVisible()
+    // The wallet exposes the collector's primary account.
+    await expect(page.getByText('· 0xA91F…E82C').filter({ visible: true })).toBeVisible()
+
+    await page.reload()
+    await expect(metaMask).toHaveAttribute('aria-checked', 'true')
+    await expect(connected).toBeVisible()
+
+    await page.getByRole('button', { name: 'Desconectar' }).filter({ visible: true }).click()
+    await expect(connected).toBeHidden()
+    await expect(metaMask).toHaveAttribute('aria-checked', 'false')
+    await submitButton(page).click()
+    await expect(page.getByText('Selecione uma carteira para pagar.').filter({ visible: true })).toBeVisible()
+
+    await page.reload()
+    await expect(metaMask).toHaveAttribute('aria-checked', 'false')
+    expect(await orderCount(page)).toBe(0)
+  })
+
+  test('trocar de provedor conecta a nova carteira', async ({ page }) => {
+    await openCheckout(page)
+    await connectWallet(page, 'MetaMask')
+    await connectWallet(page, 'WalletConnect')
+    await expect(page.getByText('MetaMask conectada').filter({ visible: true })).toBeHidden()
+    await expect(page.getByRole('radio', { name: 'MetaMask', exact: true }).filter({ visible: true })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
+  })
+})
+
+test.describe('idempotência na API', () => {
+  test('pedido sem carteira conectada é recusado', async ({ page }) => {
+    await page.goto('/')
+    const purchase = await prepareApiPurchase(page, { connect: false })
+    const response = await postOrder(page, purchase, crypto.randomUUID())
+    expect(response.status).toBe(409)
+    expect(response.body.code).toBe('WALLET_NOT_CONNECTED')
+    expect(await orderCount(page)).toBe(0)
+  })
+
+  test('a mesma chave devolve o mesmo pedido; com outro conteúdo responde 409', async ({ page }) => {
+    await page.goto('/')
+    const purchase = await prepareApiPurchase(page)
+    const key = crypto.randomUUID()
+
+    const first = await postOrder(page, purchase, key)
+    expect(first.status).toBe(201)
+
+    const retry = await postOrder(page, purchase, key)
+    expect(retry.status).toBe(200)
+    expect(retry.body.id).toBe(first.body.id)
+
+    const changed = { ...purchase, body: { ...purchase.body, collector: { ...purchase.body.collector, note: 'outro' } } }
+    const conflict = await postOrder(page, changed, key)
+    expect(conflict.status).toBe(409)
+    expect(conflict.body.code).toBe('IDEMPOTENCY_KEY_REUSED')
+
+    expect(await orderCount(page)).toBe(1)
+  })
+
+  test('requisições simultâneas com a mesma chave criam um único pedido', async ({ page }) => {
+    await page.goto('/')
+    const purchase = await prepareApiPurchase(page)
+    const key = crypto.randomUUID()
+
+    // Both requests leave the page together, like a double submit racing a retry.
+    const [a, b] = await page.evaluate(
+      ({ purchase, key }) => {
+        const send = () =>
+          fetch('/api/orders', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${purchase.token}`,
+              'Idempotency-Key': key,
+            },
+            body: JSON.stringify(purchase.body),
+          }).then(async (response) => ({ status: response.status, body: await response.json() }))
+        return Promise.all([send(), send()])
+      },
+      { purchase, key },
+    )
+    expect([a.status, b.status].sort()).toEqual([200, 201])
+    expect(a.body.id).toBe(b.body.id)
     expect(await orderCount(page)).toBe(1)
   })
 })

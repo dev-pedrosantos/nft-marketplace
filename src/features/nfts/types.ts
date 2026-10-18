@@ -13,6 +13,8 @@ export interface Nft {
   priceEth: DecimalString
   previousPriceEth?: DecimalString
   isRare?: boolean
+  /** Bumped on every price or availability change; realtime events at or below it are stale. */
+  version: number
 }
 
 export interface NftListParams {
@@ -56,8 +58,6 @@ export interface NftDetails extends Nft {
   rating: { average: string; count: number }
   editions: NftEdition[]
   defaultEditionId: EditionId
-  /** Bumped on every price or availability change; used to detect concurrent updates. */
-  version: number
 }
 
 /** Payload of the `nft.updated` realtime event. */

@@ -1,9 +1,21 @@
 import type { Page } from '@playwright/test'
-import { DEMO_USER, enableScenario, expect, login, OTHER_USER, test, waitForRealtime } from './support.ts'
+import {
+  connectWallet,
+  enableScenario,
+  expect,
+  login,
+  OTHER_USER,
+  postOrder,
+  prepareApiPurchase,
+  test,
+  waitForRealtime,
+} from './support.ts'
 
 interface OrderEvent {
+  eventId: string
   id: string
   status: string
+  version: number
 }
 
 /** Records `order.updated` events received by the app's own Socket.IO connection. */
@@ -23,7 +35,7 @@ function orderEvents(page: Page) {
 }
 
 async function payWithMetaMask(page: Page) {
-  await page.getByRole('radio', { name: 'MetaMask', exact: true }).filter({ visible: true }).click()
+  await connectWallet(page, 'MetaMask')
   await page.getByRole('button', { name: 'Confirmar compra' }).filter({ visible: true }).click()
   await expect(page).toHaveURL(/\/pedidos\/[\w-]+$/)
   return page.url().split('/').pop()!
@@ -37,7 +49,46 @@ test.describe('pedidos em tempo real', () => {
 
     const orderId = await payWithMetaMask(page)
     await expect(page.getByRole('dialog', { name: 'Compra confirmada' })).toBeVisible()
-    await expect.poll(() => orderEvents(page)).toContainEqual(expect.objectContaining({ id: orderId, status: 'confirmed' }))
+    await expect
+      .poll(() => orderEvents(page))
+      .toEqual([
+        expect.objectContaining({ id: orderId, status: 'pending', version: 1 }),
+        expect.objectContaining({ id: orderId, status: 'confirmed', version: 2 }),
+      ])
+  })
+
+  test('evento atrasado ou repetido não tira o pedido do status final', async ({ page }) => {
+    await login(page)
+    await page.goto('/checkout')
+    await recordOrderEvents(page)
+
+    const orderId = await payWithMetaMask(page)
+    const receipt = page.getByRole('dialog', { name: 'Compra confirmada' })
+    await expect(receipt).toBeVisible()
+    await expect.poll(async () => (await orderEvents(page)).length).toBe(2)
+    const [pending, confirmed] = await orderEvents(page)
+    await expect(page.getByText('Confirmado', { exact: true })).toBeVisible()
+    // Records whether the page shows the order as pending again at any moment.
+    await page.evaluate(() => {
+      const state = window as unknown as { __sawPending: boolean }
+      state.__sawPending = false
+      new MutationObserver(() => {
+        if (document.body.innerText.includes('Pagamento pendente')) state.__sawPending = true
+      }).observe(document.body, { subtree: true, childList: true, characterData: true })
+    })
+
+    // The "pending" event arrives again after the confirmation, then the confirmation repeats.
+    expect(await page.evaluate((id) => window.__kurioMock!.redeliverEvent(id), pending.eventId)).toBe(true)
+    expect(await page.evaluate((id) => window.__kurioMock!.redeliverEvent(id), confirmed.eventId)).toBe(true)
+    await expect.poll(async () => (await orderEvents(page)).length).toBe(4)
+    await page.waitForTimeout(500)
+    expect(await page.evaluate(() => (window as unknown as { __sawPending: boolean }).__sawPending)).toBe(false)
+
+    await expect(receipt).toBeVisible()
+    await receipt.getByRole('button', { name: 'Fechar comprovante' }).click()
+    await expect(page).toHaveURL(/\/conta\/pedidos/)
+    await page.goto(`/pedidos/${orderId}`)
+    await expect(page.getByText('Confirmado', { exact: true })).toBeVisible()
   })
 
   test('order.updated de outro usuário não chega à sessão atual', async ({ page }) => {
@@ -45,59 +96,21 @@ test.describe('pedidos em tempo real', () => {
     await recordOrderEvents(page)
 
     // The demo collector buys straight through the simulated API, outside the app session.
-    const orderId = await page.evaluate(async (owner) => {
-      const json = (response: Response) => {
-        if (!response.ok) throw new Error(`${response.url} → ${response.status}`)
-        return response.json()
-      }
-      const session = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: owner.email, password: owner.password }),
-      }).then(json)
-      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` }
-      const wallets = await fetch('/api/me/wallets', { headers }).then(json)
-      const wallet = wallets.find((item: { role: string }) => item.role === 'primary')
-      const cart = await fetch(`/api/cart?network=${wallet.networkId}`, { headers }).then(json)
-      const quote = await fetch('/api/checkout/quote', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ networkId: wallet.networkId, expectedTotalEth: cart.totalEth }),
-      }).then(json)
-      const order = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() },
-        body: JSON.stringify({
-          quoteId: quote.id,
-          walletProvider: 'metamask',
-          collector: {
-            displayName: wallet.displayName,
-            username: session.user.username,
-            networkId: wallet.networkId,
-            profileName: wallet.profileName,
-            walletAddress: wallet.address,
-            walletType: wallet.walletType,
-            referralCode: wallet.referralCode,
-            email: wallet.email,
-            ensName: wallet.ensName,
-            ensOrSecondary: wallet.ensOrSecondary,
-            useOtherWallet: false,
-            note: '',
-          },
-        }),
-      }).then(json)
-      ;(window as unknown as { __ownerToken: string }).__ownerToken = session.token
-      return order.id as string
-    }, DEMO_USER)
+    const purchase = await prepareApiPurchase(page)
+    const order = await postOrder(page, purchase, crypto.randomUUID())
+    expect(order.status).toBe(201)
+    const orderId = order.body.id as string
 
     // Once the owner sees it confirmed, the settlement event has already been emitted.
     await expect
       .poll(() =>
-        page.evaluate(async (id) => {
-          const token = (window as unknown as { __ownerToken: string }).__ownerToken
-          const response = await fetch(`/api/orders/${id}`, { headers: { Authorization: `Bearer ${token}` } })
-          return (await response.json()).status
-        }, orderId),
+        page.evaluate(
+          async ({ id, token }) => {
+            const response = await fetch(`/api/orders/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+            return (await response.json()).status
+          },
+          { id: orderId, token: purchase.token },
+        ),
       )
       .toBe('confirmed')
     expect(await orderEvents(page)).toEqual([])
