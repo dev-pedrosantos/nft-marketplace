@@ -20,9 +20,9 @@ test.describe('acessibilidade', () => {
   test('controles mostram foco visível ao navegar pelo teclado', async ({ page, isMobile }) => {
     test.skip(isMobile, 'Navegação por Tab é um cenário de teclado físico.')
     await page.goto('/nfts/emerald-ape-042')
-    await expect(page.getByRole('button', { name: 'COMPRAR' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'COMPRAR', exact: true })).toBeVisible()
 
-    const buy = page.getByRole('button', { name: 'COMPRAR' })
+    const buy = page.getByRole('button', { name: 'COMPRAR', exact: true })
     await buy.focus()
     await page.keyboard.press('Shift+Tab')
     await page.keyboard.press('Tab')

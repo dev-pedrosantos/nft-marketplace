@@ -7,6 +7,7 @@ import logoutIcon from '@/assets/icons/logout.svg'
 import searchIcon from '@/assets/icons/search.svg'
 import headerDivider from '@/assets/home/header-divider.svg'
 import navActiveUnderline from '@/assets/home/nav-active-underline.svg'
+import { ComingSoon } from '@/components/coming-soon'
 import { buttonVariants } from '@/components/ui/button'
 import { useSession, useViewerKey } from '@/features/auth/session-store'
 import { cartQueries } from '@/features/cart/api'
@@ -73,8 +74,12 @@ export function SiteHeader({ active = 'home', divider = true, className }: SiteH
             <NavLabel label="Mercado" active={active === 'market'} />
           </Link>
           {/* No destination exists for these items in the design yet. */}
-          <span className="text-base leading-[normal] text-foreground">Criadores</span>
-          <span className="text-base leading-[normal] text-foreground">Aprenda</span>
+          <ComingSoon feature="Criadores" className="text-base leading-[normal] text-foreground">
+            Criadores
+          </ComingSoon>
+          <ComingSoon feature="Aprenda" className="text-base leading-[normal] text-foreground">
+            Aprenda
+          </ComingSoon>
         </nav>
 
         <div className="flex items-center gap-7">

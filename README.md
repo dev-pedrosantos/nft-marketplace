@@ -173,10 +173,14 @@ iniciais, com o cenário `no-latency` ligado.
 | `checkout.spec.ts` | Compra com clique duplo sem pedido duplicado, pagamento recusado, mudança de preço, timeout com recuperação idempotente e erro 503 com nova tentativa |
 | `orders-realtime.spec.ts` | `order.updated` recebido pelo socket do dono, evento de outro usuário não entregue à sessão atual, banner de pagamento pendente após sair da página e recarregar |
 | `accessibility.spec.ts` | Foco preso no diálogo, Escape, foco visível e `prefers-reduced-motion` |
+| `footer.spec.ts` | Coleções do rodapé filtrando o catálogo, links da conta com e sem sessão, e-mail e telefone |
+| `coming-soon.spec.ts` | Aviso "Em breve" nos itens sem destino do header e do rodapé: abre no clique (não no hover), fecha pelo X, por Esc e clicando fora, fica centralizado e devolve o foco |
 | `smoke.spec.ts` | Montagem da aplicação, service worker do MSW e conexão Socket.IO |
 
-Dois testes rodam só no `desktop`: a ordenação do catálogo (o seletor não existe no layout mobile do
-Figma) e o foco visível por Tab (cenário de teclado físico). Todo o resto roda nos dois projetos.
+Quatro testes rodam só no `desktop`: a ordenação do catálogo e os itens "Em breve" do header (o
+seletor e o header não existem no layout mobile do Figma), o foco visível por Tab (cenário de
+teclado físico) e o hover sem abrir o aviso (não há hover em toque). Todo o resto roda nos dois
+projetos.
 
 **Linux / WSL:** o Chromium precisa de bibliotecas do sistema. Se aparecer
 `error while loading shared libraries: libnspr4.so`, instale-as:
@@ -236,3 +240,10 @@ docs/               # documentação de arquitetura
 - O Figma não tem frame mobile da confirmação; em telas estreitas o recibo empilha quantidade e
   subtotal e deixa os nomes quebrarem linha.
 - "Ver no Etherscan" no recibo apenas avisa que a transação é simulada.
+- O Figma não define destinos para o rodapé. No app, "Meu perfil", "Atividade" e "Lista de
+  interesse" levam às telas da conta, e as coleções filtram o catálogo da página inicial
+  (`/?collection=<id>#catalogo`). Os ícones de redes sociais não são links, porque a marca não
+  tem perfis oficiais.
+- Itens do header e do rodapé sem tela correspondente ("Criadores", "Aprenda", "Minha coleção",
+  "Estúdio do criador" e a coluna "Central de ajuda") abrem, no clique, um aviso "Em breve"
+  (`src/components/coming-soon.tsx`), construído sobre o diálogo compartilhado.

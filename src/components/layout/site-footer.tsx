@@ -1,8 +1,10 @@
+import { Link } from '@tanstack/react-router'
 import facebookIcon from '@/assets/social/facebook.svg'
 import instagramIcon from '@/assets/social/instagram.svg'
 import linkedinIcon from '@/assets/social/linkedin.svg'
 import twitterIcon from '@/assets/social/twitter.svg'
 import youtubeIcon from '@/assets/social/youtube.svg'
+import { ComingSoon } from '@/components/coming-soon'
 import { NewsletterForm } from '@/features/newsletter/components/newsletter-form'
 import { cn } from '@/lib/utils'
 
@@ -25,26 +27,69 @@ const HIGHLIGHTS = [
   },
 ]
 
-const LINK_COLUMNS = [
+interface FooterLink {
+  label: string
+  to?: '/conta/perfil' | '/conta/pedidos' | '/conta/favoritos'
+  /** Catalog collection id the item filters the home listing by. */
+  collection?: string
+}
+
+const LINK_COLUMNS: { title: string; links: FooterLink[] }[] = [
   {
     title: 'Meu perfil',
-    links: ['Meu perfil', 'Minha coleção', 'Atividade', 'Estúdio do criador', 'Lista de interesse'],
+    links: [
+      { label: 'Meu perfil', to: '/conta/perfil' },
+      { label: 'Minha coleção' },
+      { label: 'Atividade', to: '/conta/pedidos' },
+      { label: 'Estúdio do criador' },
+      { label: 'Lista de interesse', to: '/conta/favoritos' },
+    ],
   },
   {
     title: 'Central de ajuda',
     links: [
-      'Central de ajuda',
-      'Como comprar NFTs',
-      'Carteira e segurança',
-      'Política do mercado',
-      'Denunciar item',
+      { label: 'Central de ajuda' },
+      { label: 'Como comprar NFTs' },
+      { label: 'Carteira e segurança' },
+      { label: 'Política do mercado' },
+      { label: 'Denunciar item' },
     ],
   },
   {
     title: 'Coleções',
-    links: ['Arte digital', 'Fotografia', 'Música', 'Arte 3D', 'Utilidade'],
+    links: [
+      { label: 'Arte digital', collection: 'digital-art' },
+      { label: 'Fotografia', collection: 'photography' },
+      { label: 'Música', collection: 'music' },
+      { label: 'Arte 3D', collection: '3d-art' },
+      { label: 'Utilidade', collection: 'utility' },
+    ],
   },
 ]
+
+const linkClass = 'hover:text-highlight'
+
+function FooterLinkItem({ link }: { link: FooterLink }) {
+  if (link.to) {
+    return (
+      <Link to={link.to} className={linkClass}>
+        {link.label}
+      </Link>
+    )
+  }
+  if (link.collection) {
+    return (
+      <Link to="/" search={{ collection: link.collection }} hash="catalogo" className={linkClass}>
+        {link.label}
+      </Link>
+    )
+  }
+  return (
+    <ComingSoon feature={link.label} className={linkClass}>
+      {link.label}
+    </ComingSoon>
+  )
+}
 
 const SOCIAL_LINKS = [
   { label: 'Facebook', icon: facebookIcon },
@@ -100,7 +145,9 @@ export function SiteFooter({ className }: { className?: string }) {
               <h2 className="text-lg leading-4 font-bold">{column.title}</h2>
               <ul className="text-sm leading-[30px]">
                 {column.links.map((link) => (
-                  <li key={link}>{link}</li>
+                  <li key={link.label}>
+                    <FooterLinkItem link={link} />
+                  </li>
                 ))}
               </ul>
             </nav>

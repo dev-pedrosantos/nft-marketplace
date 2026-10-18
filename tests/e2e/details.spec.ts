@@ -25,7 +25,7 @@ test.describe('detalhes do NFT', () => {
     await stepper.getByRole('button', { name: `Diminuir quantidade de ${NFT}` }).click()
     await expect(stepper.locator('output')).toHaveText('3')
 
-    await page.getByRole('button', { name: isMobile ? 'Comprar NFT' : 'COMPRAR' }).filter({ visible: true }).click()
+    await page.getByRole('button', { name: isMobile ? 'Comprar NFT' : 'COMPRAR', exact: true }).filter({ visible: true }).click()
     await expect(page).toHaveURL(/\/carrinho$/)
     const line = page.getByRole('list', { name: 'Itens do carrinho' }).filter({ visible: true }).getByRole('listitem')
     await expect(line).toHaveCount(1)

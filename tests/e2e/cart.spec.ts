@@ -63,7 +63,7 @@ test.describe('carrinho', () => {
 
   test('carrinho de visitante é mantido no login e segue para o checkout', async ({ page, isMobile }) => {
     await page.goto('/nfts/golden-signal-160')
-    await page.getByRole('button', { name: isMobile ? 'Comprar NFT' : 'COMPRAR' }).filter({ visible: true }).click()
+    await page.getByRole('button', { name: isMobile ? 'Comprar NFT' : 'COMPRAR', exact: true }).filter({ visible: true }).click()
     await expect(page).toHaveURL(/\/carrinho$/)
     await expect(cartLines(page)).toHaveCount(1)
 
