@@ -36,3 +36,6 @@ dist-ssr
 .figma-tmp
 .shots
 .playwright-libs
+
+# Vercel CLI link (.env.local, written by the CLI, is covered by *.local)
+.vercel

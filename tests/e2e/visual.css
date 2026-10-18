@@ -1,5 +1,8 @@
-/* Development-only overlays: the suite runs against the Vite dev server. */
+/*
+ * Development-only overlays: the suite runs against the Vite dev server. `visibility` is not
+ * enough, because the query devtools logo sets its own and stayed in the screenshots.
+ */
 button[aria-label='Open TanStack Router Devtools'],
 button[aria-label='Open Tanstack query devtools'] {
-  visibility: hidden !important;
+  display: none !important;
 }

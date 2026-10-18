@@ -6,6 +6,10 @@ Não há backend real: a API REST e o Socket.IO são simulados no navegador pelo
 persistido no `localStorage`. **Não existe blockchain nem pagamento real**: a compra é simulada e o
 resultado depende apenas da resposta da API mockada.
 
+**Aplicação publicada:** <https://nft-marketplace-livid-ten.vercel.app> (build de demonstração na
+Vercel, com MSW e o tempo real simulado). **Repositório:**
+<https://github.com/dev-pedrosantos/nft-marketplace>.
+
 A arquitetura (camadas, cache, sessão, checkout idempotente, tempo real, mocks, performance),
 os desvios do Figma e as limitações estão em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
@@ -168,6 +172,10 @@ de SPA (arquivos estáticos têm precedência sobre o rewrite) e cache longo par
 importar o repositório na Vercel (ou rodar `npx vercel --prod`); nenhuma variável de ambiente
 precisa ser configurada no painel.
 
+A versão publicada em <https://nft-marketplace-livid-ten.vercel.app> foi enviada pela CLI
+(`vercel deploy --prod`, projeto `nft-marketplace`). O projeto não está ligado ao GitHub, então um
+push não publica sozinho: depois de mudar o código, rode `vercel deploy --prod` de novo.
+
 ## Testes
 
 ```bash
@@ -181,6 +189,10 @@ Os specs ficam em `tests/e2e` e rodam nos projetos `desktop` (Desktop Chrome) e 
 (Pixel 7). O Playwright sobe o `npm run dev` ou reutiliza um servidor já aberto na porta 5173.
 Cada teste usa um contexto novo do navegador, então o banco simulado começa sempre dos dados
 iniciais, com o cenário `no-latency` ligado.
+
+A suíte foi feita para o servidor de desenvolvimento. Contra o build publicado, ela passa inteira
+exceto os testes de tempo real que importam `src/lib/realtime/socket.ts` direto na página para
+ouvir o `socket.io-client`, caminho que só existe no servidor do Vite.
 
 | Spec | Cobertura |
 | --- | --- |
