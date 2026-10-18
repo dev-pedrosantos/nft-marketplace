@@ -3,6 +3,7 @@ import { useRouter } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { USER_SCOPED_QUERY_ROOTS } from '@/features/auth/api'
 import { useSessionState } from '@/features/auth/session-store'
+import { clearCheckoutDraft, readCheckoutDraft } from '@/features/orders/checkout-draft'
 
 /**
  * Reacts to session changes from any source (logout, expiry, another tab):
@@ -31,6 +32,8 @@ export function SessionSync() {
     void queryClient.invalidateQueries({ queryKey: ['cart'] })
 
     if (!userId) {
+      // An expired session keeps the checkout draft so signing in again resumes it.
+      if (!expired) clearCheckoutDraft()
       const isPrivate = router.state.matches.some((match) => match.routeId.startsWith('/_authenticated'))
       if (isPrivate) {
         void router.navigate({
@@ -40,6 +43,7 @@ export function SessionSync() {
         })
       }
     } else {
+      if (!readCheckoutDraft(userId)) clearCheckoutDraft()
       // Route guards and loaders depend on the session.
       void router.invalidate()
     }

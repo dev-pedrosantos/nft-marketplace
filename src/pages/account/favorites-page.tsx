@@ -20,7 +20,7 @@ export function FavoritesPage() {
               <Skeleton key={index} className="aspect-[258/300]" />
             ))}
           </div>
-        ) : query.isError ? (
+        ) : query.isError && !query.data ? (
           <ErrorState
             message={errorMessage(query.error, 'Não foi possível carregar seus favoritos.')}
             onRetry={() => query.refetch()}

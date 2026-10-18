@@ -29,7 +29,7 @@ export function WalletsPage() {
             ))}
           </div>
         </div>
-      ) : query.isError ? (
+      ) : query.isError && !query.data ? (
         <ErrorState
           message={errorMessage(query.error, 'Não foi possível carregar suas carteiras.')}
           onRetry={() => query.refetch()}

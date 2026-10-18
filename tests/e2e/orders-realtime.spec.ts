@@ -123,6 +123,51 @@ test.describe('pedidos em tempo real', () => {
     expect(ownOrder).toBe(404)
   })
 
+  test('queda da conexão com pedido pendente: a confirmação perdida chega ao reconectar, sem nova compra', async ({ page }) => {
+    await login(page)
+    await page.goto('/checkout')
+    await waitForRealtime(page)
+    const orderId = await payWithMetaMask(page)
+    await page.evaluate(() => window.__kurioMock!.enable('offline'))
+    await expect.poll(() => page.evaluate(() => window.__kurioMock!.realtimeClients())).toBe(0)
+
+    // The payment settles while the app cannot hear the socket nor reach the API.
+    const storedStatus = () =>
+      page.evaluate((id) => {
+        const db = JSON.parse(localStorage.getItem('kurio.mock-db')!) as { orders: { id: string; status: string }[] }
+        return db.orders.find((order) => order.id === id)?.status
+      }, orderId)
+    await expect.poll(storedStatus, { timeout: 10_000 }).toBe('confirmed')
+    const receipt = page.getByRole('dialog', { name: 'Compra confirmada' })
+    await expect(page.getByText(/Aguardando a confirmação do pagamento/)).toBeVisible()
+    await expect(page.getByText(/Sem conexão com o servidor no momento/)).toBeVisible()
+    await expect(receipt).toHaveCount(0)
+
+    await page.evaluate(() => window.__kurioMock!.disable('offline'))
+    await expect(receipt).toBeVisible({ timeout: 15_000 })
+    const orders = await page.evaluate(() => (JSON.parse(localStorage.getItem('kurio.mock-db')!) as { orders: unknown[] }).orders.length)
+    expect(orders).toBe(1)
+  })
+
+  test('o recibo mantém os valores da compra depois que o catálogo muda', async ({ page }) => {
+    await login(page)
+    await page.goto('/checkout')
+    const orderId = await payWithMetaMask(page)
+    const receipt = page.getByRole('dialog', { name: 'Compra confirmada' })
+    await expect(receipt).toBeVisible()
+    // Emerald Ape #042 × 2 at 1.19; order total 26.846 ETH.
+    await expect(receipt).toContainText('2.38 ETH')
+    await expect(receipt).toContainText('26.846 ETH')
+
+    await page.evaluate(() => window.__kurioMock!.setPrice('emerald-ape-042', '9.99'))
+    await page.goto(`/pedidos/${orderId}`)
+    await expect(receipt).toBeVisible()
+    await expect(receipt).toContainText('2.38 ETH')
+    await expect(receipt).toContainText('26.846 ETH')
+    await expect(receipt).not.toContainText('19.98 ETH')
+    await expect(receipt).not.toContainText('9.99 ETH')
+  })
+
   test('pagamento pendente é recuperado em outras páginas e após recarregar', async ({ page }) => {
     await login(page)
     await page.goto('/checkout')

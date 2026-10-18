@@ -21,7 +21,7 @@ export function OrdersPage() {
               <Skeleton key={index} className="h-[70px] rounded-none" />
             ))}
           </div>
-        ) : query.isError ? (
+        ) : query.isError && !query.data ? (
           <ErrorState
             message={errorMessage(query.error, 'Não foi possível carregar seus pedidos.')}
             onRetry={() => query.refetch()}

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import {
+  authDialog,
   connectWallet,
   disableScenario,
   enableScenario,
@@ -7,7 +8,9 @@ import {
   login,
   postOrder,
   prepareApiPurchase,
+  submitLogin,
   test,
+  waitForRealtime,
 } from './support.ts'
 
 function orderCount(page: Page) {
@@ -80,6 +83,79 @@ test.describe('checkout', () => {
     await review.getByRole('button', { name: 'Confirmar novo total' }).click()
     await expect(page.getByRole('dialog', { name: 'Compra confirmada' })).toBeVisible({ timeout: 10_000 })
     expect(await orderCount(page)).toBe(1)
+  })
+
+  test('preço alterado pelo socket no checkout exige nova revisão e recusa a cotação antiga', async ({ page }) => {
+    await openCheckout(page)
+    await waitForRealtime(page)
+    await connectWallet(page, 'MetaMask')
+    const setPrice = (price: string) =>
+      page.evaluate((value) => window.__kurioMock!.setPrice('emerald-ape-042', value), price)
+
+    await setPrice('1.30')
+    await expect(page.getByText('Alguns itens mudaram de preço ou disponibilidade.').filter({ visible: true })).toBeVisible()
+
+    await submitButton(page).click()
+    const review = page.getByRole('dialog', { name: 'Os valores mudaram' })
+    await expect(review).toContainText('Emerald Ape #042: O preço mudou de 1.19 ETH para 1.30 ETH.')
+    expect(await orderCount(page)).toBe(0)
+
+    // The price moves again while the review is open: that quote can no longer be charged.
+    await setPrice('1.45')
+    await review.getByRole('button', { name: 'Confirmar novo total' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'mudou depois da revisão' }).filter({ visible: true })).toBeVisible()
+    expect(await orderCount(page)).toBe(0)
+
+    await submitButton(page).click()
+    await expect(review).toContainText('Emerald Ape #042: O preço mudou de 1.30 ETH para 1.45 ETH.')
+    await review.getByRole('button', { name: 'Confirmar novo total' }).click()
+    await expect(page.getByRole('dialog', { name: 'Compra confirmada' })).toBeVisible({ timeout: 10_000 })
+    const charged = await page.evaluate(() => {
+      const db = JSON.parse(localStorage.getItem('kurio.mock-db')!) as { orders: { items: { nftId: string; unitPriceEth: string }[] }[] }
+      return db.orders.map((order) => order.items.find((item) => item.nftId === 'emerald-ape-042')?.unitPriceEth)
+    })
+    expect(charged).toEqual(['1.45'])
+  })
+
+  test('sessão expirada no checkout pede login e retoma a compra com os dados preenchidos', async ({ page, isMobile }) => {
+    await openCheckout(page)
+    // Desktop shows the collector form; the mobile frame only picks one of the saved wallets.
+    const filled = isMobile
+      ? page.getByRole('radio', { name: /^Reserva/ })
+      : page.getByLabel('Nome de exibição').filter({ visible: true })
+    if (isMobile) await filled.click()
+    else await filled.fill('Nova Sato (presente)')
+    await connectWallet(page, 'MetaMask')
+
+    await page.evaluate(() => window.__kurioMock!.expireSessions())
+    await submitButton(page).click()
+    const dialog = authDialog(page)
+    await expect(dialog.getByText('Sua sessão expirou. Entre novamente para continuar.')).toBeVisible()
+    expect(await orderCount(page)).toBe(0)
+
+    await submitLogin(page)
+    await expect(page).toHaveURL(/\/checkout$/)
+    if (isMobile) await expect(filled).toHaveAttribute('aria-checked', 'true')
+    else await expect(filled).toHaveValue('Nova Sato (presente)')
+
+    await connectWallet(page, 'MetaMask')
+    await submitButton(page).click()
+    await expect(page.getByRole('dialog', { name: 'Compra confirmada' })).toBeVisible({ timeout: 10_000 })
+    expect(await orderCount(page)).toBe(1)
+    const collector = await page.evaluate(() => {
+      const db = JSON.parse(localStorage.getItem('kurio.mock-db')!) as { orders: { walletAddress: string }[] }
+      return db.orders[0].walletAddress
+    })
+    expect(collector).toBe(isMobile ? '0x5c3e9a1b7d2f4e6a8c0b1d3f5a7c9e1b3d5f7a90' : '0xa91f4b7c2d9e0f13a5b6c7d8e9f0a1b2c3d4e82c')
+    expect(await page.evaluate(() => sessionStorage.getItem('kurio.checkout.draft'))).toBeNull()
+  })
+
+  test('logout descarta o rascunho do checkout', async ({ page }) => {
+    await openCheckout(page)
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('kurio.checkout.draft'))).toContain('user-demo')
+    await page.goto('/conta/perfil')
+    await page.getByRole('button', { name: 'Sair' }).click()
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('kurio.checkout.draft'))).toBeNull()
   })
 
   test('timeout permite tentar de novo com a mesma chave de idempotência', async ({ page }) => {

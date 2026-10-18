@@ -21,7 +21,8 @@ interface WalletFormProps {
 export function WalletForm({ idPrefix, initial, submitLabel, pending, error, success, onSubmit, onCancel }: WalletFormProps) {
   const form = useForm<WalletValues>(initial)
   const { data: filters } = useQuery(nftQueries.filters())
-  const serverFieldErrors = error ? (toApiError(error).fieldErrors as FieldErrors<WalletValues> | undefined) : undefined
+  const serverFieldErrors = (error ? toApiError(error).fieldErrors : {}) as FieldErrors<WalletValues>
+  const hasServerFieldErrors = Object.keys(serverFieldErrors).length > 0
   const errors = { ...serverFieldErrors, ...form.errors }
 
   const submit = (event: FormEvent) => {
@@ -110,7 +111,7 @@ export function WalletForm({ idPrefix, initial, submitLabel, pending, error, suc
         </Field>
       </div>
 
-      {error != null && !serverFieldErrors && (
+      {error != null && !hasServerFieldErrors && (
         <FormMessage tone="error">{errorMessage(error, 'Não foi possível salvar a carteira.')}</FormMessage>
       )}
       {success && <FormMessage tone="success">{success}</FormMessage>}

@@ -32,38 +32,36 @@ export function OrderPage({ orderId }: { orderId: string }) {
         <Breadcrumb
           items={[{ label: 'Início', to: '/' }, { label: 'Mercado', to: '/', hash: 'catalogo' }, { label: 'Pedido' }]}
         />
-        {query.isPending ? (
+        {query.data ? (
+          <OrderView order={query.data} refreshFailed={query.isError} />
+        ) : query.isPending ? (
           <div role="status" aria-label="Carregando pedido" className="flex flex-col gap-3">
             <Skeleton className="h-10 w-72" />
             <Skeleton className="h-[220px]" />
           </div>
-        ) : query.isError ? (
-          toApiError(query.error).status === 404 ? (
-            <EmptyState
-              title="Pedido não encontrado"
-              description="Este pedido não existe ou pertence a outra conta."
-              action={
-                <Link to="/conta/pedidos" className="text-[15px] text-highlight">
-                  Ver meus pedidos
-                </Link>
-              }
-            />
-          ) : (
-            <ErrorState
-              message={errorMessage(query.error, 'Não foi possível carregar o pedido.')}
-              onRetry={() => query.refetch()}
-              retrying={query.isFetching}
-            />
-          )
+        ) : toApiError(query.error).status === 404 ? (
+          <EmptyState
+            title="Pedido não encontrado"
+            description="Este pedido não existe ou pertence a outra conta."
+            action={
+              <Link to="/conta/pedidos" className="text-[15px] text-highlight">
+                Ver meus pedidos
+              </Link>
+            }
+          />
         ) : (
-          <OrderView order={query.data} />
+          <ErrorState
+            message={errorMessage(query.error, 'Não foi possível carregar o pedido.')}
+            onRetry={() => query.refetch()}
+            retrying={query.isFetching}
+          />
         )}
       </div>
     </PageShell>
   )
 }
 
-function OrderView({ order }: { order: Order }) {
+function OrderView({ order, refreshFailed }: { order: Order; refreshFailed: boolean }) {
   return (
     <div className="flex flex-col gap-6 md:max-w-[782px]">
       <div className="flex flex-wrap items-center gap-3">
@@ -72,7 +70,7 @@ function OrderView({ order }: { order: Order }) {
       </div>
 
       <div aria-live="polite">
-        {order.status === 'pending' && <PendingNotice order={order} />}
+        {order.status === 'pending' && <PendingNotice order={order} refreshFailed={refreshFailed} />}
         {order.status === 'failed' && <FailedNotice order={order} />}
         {order.status === 'confirmed' && (
           <p className="text-sm leading-[22px] text-muted-foreground">
@@ -91,7 +89,7 @@ function OrderView({ order }: { order: Order }) {
   )
 }
 
-function PendingNotice({ order }: { order: Order }) {
+function PendingNotice({ order, refreshFailed }: { order: Order; refreshFailed: boolean }) {
   const [now, setNow] = useState(() => Date.now())
   const elapsed = now - Date.parse(order.createdAt)
   const slow = elapsed >= STILL_PENDING_AFTER_MS
@@ -115,6 +113,11 @@ function PendingNotice({ order }: { order: Order }) {
             ? 'O pagamento está demorando mais que o normal. Você pode sair desta página: o pedido continua sendo acompanhado e o status é atualizado em Atividade.'
             : 'Isso costuma levar alguns segundos. Não feche a carteira.'}
         </p>
+        {refreshFailed && (
+          <p className="text-coral">
+            Sem conexão com o servidor no momento. O status é atualizado assim que a conexão voltar.
+          </p>
+        )}
         {slow && (
           <Link to="/conta/pedidos" className="w-fit font-bold text-highlight underline">
             Ver meus pedidos

@@ -59,6 +59,74 @@ test.describe('catálogo', () => {
     await expect.poll(() => cards(page).allInnerTexts()).not.toEqual(firstPage)
   })
 
+  test('filtros combinados reiniciam a paginação e voltam pelo histórico', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'A coluna de filtros só aparece a partir de 1024 px.')
+    await page.goto('/')
+    await expect(cards(page).first()).toBeVisible()
+    const filters = catalog(page).locator('aside')
+    const pagination = page.getByRole('navigation', { name: 'Paginação' })
+    const currentPage = (number: number) =>
+      expect(pagination.getByRole('button', { name: `Página ${number}` })).toHaveAttribute('aria-current', 'page')
+    const lastListRequest = () =>
+      page.waitForRequest((request) => new URL(request.url()).pathname === '/api/nfts')
+    /** Names the simulated API returns for the same filters, to compare with the grid. */
+    const expectedNames = (query: string) =>
+      page.evaluate(
+        (search) => fetch(`/api/nfts?${search}`).then((response) => response.json()).then((data) => data.items.map((item: { name: string }) => item.name)),
+        query,
+      )
+    const shownNames = () => cards(page).locator('h3').allInnerTexts()
+
+    await filters.getByRole('button', { name: /^Música/ }).click()
+    await expect(page).toHaveURL(/collection=music/)
+    await pagination.getByRole('button', { name: 'Próxima página' }).click()
+    await expect(page).toHaveURL(/page=2/)
+    await currentPage(2)
+
+    let request = lastListRequest()
+    await filters.getByRole('button', { name: /^Polygon/ }).click()
+    let params = new URL((await request).url()).searchParams
+    expect(params.get('collection')).toBe('music')
+    expect(params.get('network')).toBe('polygon')
+    expect(params.get('page')).toBe('1')
+    await expect(page).not.toHaveURL(/page=/)
+    await currentPage(1)
+
+    request = lastListRequest()
+    await filters.getByLabel('Preço máximo').fill('5')
+    await filters.getByRole('button', { name: 'Aplicar' }).click()
+    params = new URL((await request).url()).searchParams
+    expect([params.get('collection'), params.get('network'), params.get('maxPrice')]).toEqual(['music', 'polygon', '5'])
+    await expect(page).toHaveURL(/collection=music.*network=polygon.*maxPrice=5|maxPrice=5.*network=polygon/)
+
+    const combined = await expectedNames('collection=music&network=polygon&maxPrice=5&page=1')
+    expect(combined.length).toBeGreaterThan(0)
+    await expect.poll(shownNames).toEqual(combined)
+    for (const text of await cards(page).allInnerTexts()) {
+      expect(Number(/(\d+\.\d+) ETH/.exec(text)?.[1])).toBeLessThanOrEqual(5)
+    }
+
+    await page.reload()
+    await expect(filters.getByRole('button', { name: /^Música/ })).toHaveAttribute('aria-pressed', 'true')
+    await expect(filters.getByRole('button', { name: /^Polygon/ })).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(shownNames).toEqual(combined)
+
+    await page.goBack()
+    await expect(page).not.toHaveURL(/maxPrice/)
+    await expect(page).toHaveURL(/network=polygon/)
+    await expect.poll(shownNames).toEqual(await expectedNames('collection=music&network=polygon&page=1'))
+
+    await page.goBack()
+    await expect(page).not.toHaveURL(/network/)
+    await expect(filters.getByRole('button', { name: /^Polygon/ })).toHaveAttribute('aria-pressed', 'false')
+    await currentPage(2)
+    await expect.poll(shownNames).toEqual(await expectedNames('collection=music&page=2'))
+
+    await page.goForward()
+    await expect(page).toHaveURL(/network=polygon/)
+    await currentPage(1)
+  })
+
   test('abas filtram a listagem pela URL', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('tab', { name: 'Em alta' }).click()

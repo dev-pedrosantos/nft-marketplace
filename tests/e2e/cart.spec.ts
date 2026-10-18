@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { authDialog, expect, login, submitLogin, test } from './support.ts'
+import { authDialog, expect, login, submitLogin, test, waitForRealtime } from './support.ts'
 
 function summary(page: Page, isMobile: boolean) {
   return isMobile
@@ -38,6 +38,30 @@ test.describe('carrinho', () => {
     await expect(summary(page, isMobile)).toContainText('24.163 ETH')
     await summary(page, isMobile).getByRole('button', { name: 'Remover' }).click()
     await expect(summary(page, isMobile)).toContainText('26.846 ETH')
+  })
+
+  test('preço alterado pelo socket com o carrinho aberto avisa, atualiza o resumo e bloqueia a finalização', async ({ page, isMobile }) => {
+    await login(page)
+    await page.goto('/carrinho')
+    await waitForRealtime(page)
+    const totals = summary(page, isMobile)
+    await expect(totals).toContainText('26.846 ETH')
+
+    // Emerald Ape #042 × 2 goes from 1.19 to 1.50: subtotal 27.45, plus the 0.016 network fee.
+    await page.evaluate(() => window.__kurioMock!.setPrice('emerald-ape-042', '1.50'))
+    const line = cartLines(page).filter({ hasText: 'Emerald Ape #042' })
+    await expect(line.getByRole('alert')).toContainText('O preço mudou de 1.19 ETH para 1.50 ETH.')
+    await expect(totals).toContainText('27.45 ETH')
+    await expect(totals).toContainText('27.466 ETH')
+
+    await totals.getByRole('button', { name: 'Conectar e finalizar' }).click()
+    await expect(page.getByText('Revise os avisos dos itens antes de finalizar.').filter({ visible: true })).toBeVisible()
+    await expect(page).toHaveURL(/\/carrinho$/)
+
+    await line.getByRole('button', { name: 'Aceitar novo preço' }).click()
+    await expect(line.getByRole('alert')).toHaveCount(0)
+    await totals.getByRole('button', { name: 'Conectar e finalizar' }).click()
+    await expect(page).toHaveURL(/\/checkout$/)
   })
 
   test('altera quantidade, remove itens e persiste após recarregar', async ({ page, isMobile }) => {

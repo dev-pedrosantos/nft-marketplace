@@ -46,7 +46,7 @@ export function NftDetailsPage({ nftId }: { nftId: string }) {
     )
   }
 
-  if (query.isError) {
+  if (query.isError && !query.data) {
     const notFound = toApiError(query.error).status === 404
     return (
       <PageShell active="market" divider={false}>

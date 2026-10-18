@@ -22,6 +22,7 @@ import { OrderTotals } from '@/features/cart/components/order-totals'
 import { PromoCode } from '@/features/cart/components/promo-code'
 import type { Cart } from '@/features/cart/types'
 import { nftQueries } from '@/features/nfts/api'
+import { clearCheckoutDraft, readCheckoutDraft, saveCheckoutDraft } from '@/features/orders/checkout-draft'
 import { useCheckout } from '@/features/orders/use-checkout'
 import { useConnectWallet, useDisconnectWallet, useWalletConnection, useWallets } from '@/features/wallets/api'
 import {
@@ -91,7 +92,7 @@ export function CheckoutPage() {
         <h1 className="hidden md:block md:sr-only">Pagamento</h1>
         {!session || wallets.isPending ? (
           <CheckoutSkeleton />
-        ) : wallets.isError ? (
+        ) : wallets.isError && !wallets.data ? (
           <ErrorState
             message={errorMessage(wallets.error, 'Não foi possível carregar suas carteiras.')}
             onRetry={() => wallets.refetch()}
@@ -110,9 +111,20 @@ function CheckoutContent({ user, wallets }: { user: User; wallets: Wallet[] }) {
   const viewer = useViewerKey()
   const primary = wallets.find((wallet) => wallet.role === 'primary') ?? wallets[0]
   const secondary = wallets.find((wallet) => wallet.role === 'secondary')
-  const form = useForm<CheckoutValues>(valuesFrom(user, primary))
-  const [selectedWalletId, setSelectedWalletId] = useState(primary?.id ?? null)
-  const [useOtherWallet, setUseOtherWallet] = useState(false)
+  const [draft] = useState(() => {
+    const saved = readCheckoutDraft<CheckoutValues>(user.id)
+    // A wallet removed meanwhile cannot be resumed; start again from the current ones.
+    return saved && (saved.selectedWalletId === null || wallets.some((wallet) => wallet.id === saved.selectedWalletId))
+      ? saved
+      : null
+  })
+  const form = useForm<CheckoutValues>(draft?.values ?? valuesFrom(user, primary))
+  const [selectedWalletId, setSelectedWalletId] = useState(draft ? draft.selectedWalletId : (primary?.id ?? null))
+  const [useOtherWallet, setUseOtherWallet] = useState(draft?.useOtherWallet ?? false)
+
+  useEffect(() => {
+    saveCheckoutDraft({ userId: user.id, values: form.values, selectedWalletId, useOtherWallet })
+  }, [user.id, form.values, selectedWalletId, useOtherWallet])
   const connection = useWalletConnection()
   const connectWallet = useConnectWallet()
   const disconnectWallet = useDisconnectWallet()
@@ -124,7 +136,10 @@ function CheckoutContent({ user, wallets }: { user: User; wallets: Wallet[] }) {
   const networkId = form.values.networkId || DEFAULT_NETWORK_ID
   const cart = useQuery(cartQueries.detail(viewer, networkId))
   const checkout = useCheckout({
-    onPlaced: (order) => void navigate({ to: '/pedidos/$orderId', params: { orderId: order.id } }),
+    onPlaced: (order) => {
+      clearCheckoutDraft()
+      void navigate({ to: '/pedidos/$orderId', params: { orderId: order.id } })
+    },
   })
 
   const selectWallet = (wallet: Wallet) => {
@@ -182,7 +197,7 @@ function CheckoutContent({ user, wallets }: { user: User; wallets: Wallet[] }) {
   }
 
   if (cart.isPending) return <CheckoutSkeleton />
-  if (cart.isError) {
+  if (cart.isError && !cart.data) {
     return (
       <ErrorState
         message={errorMessage(cart.error, 'Não foi possível carregar o carrinho.')}

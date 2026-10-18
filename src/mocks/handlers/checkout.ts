@@ -231,6 +231,18 @@ export const checkoutHandlers: HttpHandler[] = [
       return errorResponse(410, 'QUOTE_EXPIRED', 'Os valores revisados expiraram. Revise o pedido novamente.')
     }
 
+    // The reviewed total is only charged while the prices it was built from still hold.
+    const repriced = stored.quote.items.find(
+      (item) => compareAmounts(inventoryOf(item.nftId).priceEth, item.unitPriceEth) !== 0,
+    )
+    if (repriced) {
+      return errorResponse(
+        409,
+        'QUOTE_OUTDATED',
+        `O preço de ${repriced.name} mudou depois da revisão. Confirme a compra de novo para revisar os valores.`,
+      )
+    }
+
     // Someone else may have bought the last units since the quote.
     const shortage = stored.quote.items.find(
       (item) => inventoryOf(item.nftId).available[item.editionId] < item.quantity,

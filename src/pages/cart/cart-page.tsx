@@ -47,14 +47,16 @@ export function CartPage() {
         />
         <h1 className="hidden md:block md:sr-only">Carrinho de NFTs</h1>
 
-        {query.isPending ? (
-          <CartSkeleton />
-        ) : query.isError ? (
-          <ErrorState
-            message={errorMessage(query.error, 'Não foi possível carregar o carrinho.')}
-            onRetry={() => query.refetch()}
-            retrying={query.isFetching}
-          />
+        {!query.data ? (
+          query.isPending ? (
+            <CartSkeleton />
+          ) : (
+            <ErrorState
+              message={errorMessage(query.error, 'Não foi possível carregar o carrinho.')}
+              onRetry={() => query.refetch()}
+              retrying={query.isFetching}
+            />
+          )
         ) : query.data.items.length === 0 ? (
           <EmptyState
             title="Seu carrinho está vazio"

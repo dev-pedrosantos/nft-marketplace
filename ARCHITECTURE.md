@@ -48,6 +48,10 @@ O TanStack Query é a única fonte de dados do servidor. Não há store global p
   queries da conta anterior (`USER_SCOPED_QUERY_ROOTS`) e invalida o carrinho.
 - **Padrões:** `staleTime` de 60 s, sem refetch no foco e até 2 novas tentativas automáticas,
   exceto para erros 4xx (um 429 não é repetido sozinho; a tela oferece "Tentar novamente").
+- **Falha em atualização de fundo:** a tela de erro só aparece quando nada foi carregado. Se uma
+  consulta que já tem dados falha ao atualizar (polling do pedido, invalidação após um evento ou
+  reconexão), os dados continuam na tela; a página do pedido pendente avisa que está sem conexão e
+  segue tentando.
 - **Cancelamento:** as queries do catálogo repassam o `signal` do TanStack Query ao Axios. Ao trocar
   filtros, aba ou NFT, a requisição anterior é abortada; e como cada combinação tem a própria
   chave, uma resposta atrasada nunca substitui a lista da escolha atual.
@@ -74,7 +78,11 @@ formata.
 - **Expiração:** um timer encerra a sessão em `expiresAt`, e qualquer resposta `401
   SESSION_EXPIRED` faz o mesmo. A store registra onde o usuário estava (`returnTo`), o diálogo de
   login abre com o aviso de sessão expirada e, depois do novo login, o usuário volta para essa
-  página, mesmo que o redirecionamento ainda não tenha chegado à URL.
+  página, mesmo que o redirecionamento ainda não tenha chegado à URL. No checkout, os dados do
+  colecionador, a carteira escolhida e a opção "outra carteira" ficam em
+  `sessionStorage['kurio.checkout.draft']`, associados ao id do usuário, e voltam preenchidos
+  depois do novo login. O rascunho é apagado quando o pedido é criado, no logout e quando outro
+  usuário entra.
 - **Rotas privadas:** o layout `_authenticated` redireciona para `/?auth=login&redirect=<url>`.
   O diálogo de login é controlado pela URL (`?auth=login|signup`), então abre sobre qualquer tela.
 - **Rota inexistente:** o `defaultNotFoundComponent` do router mostra "Página não encontrada" com
@@ -105,7 +113,9 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
    carrinho. Nesse caso o checkout mostra "Sua compra anterior ainda não foi confirmada" com o
    botão "Verificar compra", que reenvia a tentativa salva (inclusive depois de recarregar a página).
 6. **Erros definitivos** (4xx, como cotação expirada ou estoque insuficiente) descartam a tentativa
-   e recarregam o carrinho.
+   e recarregam o carrinho. Se um preço mudar depois da revisão (por exemplo, com o diálogo "Os
+   valores mudaram" aberto), `POST /orders` compara a cotação com o estoque atual e responde
+   `409 QUOTE_OUTDATED`; o próximo envio gera uma nova revisão com a mudança.
 7. **Carteira conectada:** escolher o provedor pede a conexão à carteira simulada
    (`POST /me/wallet-connection`). Enquanto a "aprovação" não chega, o checkout mostra a espera e
    bloqueia o envio; recusada (cenário `wallet-rejected`), mostra o erro e "Conectar de novo";
@@ -258,6 +268,9 @@ throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
 - Itens do header e do rodapé sem tela correspondente ("Criadores", "Aprenda", "Minha coleção",
   "Estúdio do criador" e a coluna "Central de ajuda") abrem, no clique, um aviso "Em breve"
   (`src/components/coming-soon.tsx`), construído sobre o diálogo compartilhado.
+- A 320 px (equivalente a 400% de zoom em 1280 px) a coluna do rodapé ficava 3 px mais larga que a
+  tela; ela passou a ser limitada à largura disponível. De 390 px para cima nada muda, e as
+  baselines visuais seguem iguais.
 - O Figma não tem frame de página não encontrada nem de carregamento. A 404 reaproveita o estado
   vazio compartilhado, e os skeletons usam a cor `surface-raised` com um brilho que atravessa o
   bloco (`skeleton-shimmer` em `src/index.css`), parado quando o sistema pede menos movimento.

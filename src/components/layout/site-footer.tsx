@@ -103,7 +103,7 @@ export function SiteFooter({ className }: { className?: string }) {
   return (
     <footer className={cn('flex flex-col', className)}>
       <div className="bg-surface-card p-6 md:p-8 wide:h-[250px]">
-        <div className="grid gap-8 md:grid-cols-3 wide:flex wide:h-full wide:items-start wide:gap-0">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-3 wide:flex wide:h-full wide:items-start wide:gap-0">
           {HIGHLIGHTS.map((item, index) => (
             <div key={item.letter} className="contents">
               {index > 0 && <span aria-hidden className="hidden w-px self-stretch bg-primary wide:block" />}

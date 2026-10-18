@@ -65,6 +65,26 @@ test.describe('autenticação e sessão', () => {
     await expect(page.getByLabel('Nome de usuário')).toHaveValue('nova.colecionadora')
   })
 
+  test('cadastro com e-mail ou usuário já existentes mostra o conflito nos campos', async ({ page }) => {
+    await page.goto('/?auth=signup')
+    const dialog = authDialog(page)
+    await dialog.getByLabel('Nome de usuário').fill('nova.sato')
+    await dialog.getByLabel('E-mail').fill(DEMO_USER.email.toUpperCase())
+    await dialog.getByLabel('Senha', { exact: true }).fill('segredo123')
+    await dialog.getByLabel('Confirmar senha').fill('segredo123')
+    await dialog.getByRole('button', { name: /^(Criar conta|Criar perfil)$/ }).click()
+
+    await expect(dialog.getByLabel('E-mail')).toHaveAccessibleDescription('Já existe uma conta com este e-mail.')
+    await expect(dialog.getByLabel('Nome de usuário')).toHaveAccessibleDescription('Este nome de usuário já está em uso.')
+    await expect(dialog).toBeVisible()
+    expect(await page.evaluate(() => localStorage.getItem('kurio.session'))).toBeNull()
+
+    await dialog.getByLabel('Nome de usuário').fill('outra.pessoa')
+    await dialog.getByLabel('E-mail').fill('outra@kurio.com')
+    await dialog.getByRole('button', { name: /^(Criar conta|Criar perfil)$/ }).click()
+    await expect(dialog).toBeHidden()
+  })
+
   test('troca de senha confere a atual e só aceita a nova no login', async ({ page }) => {
     const newPassword = 'nova-senha-456'
     await login(page)

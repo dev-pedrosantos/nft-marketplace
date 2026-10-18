@@ -171,7 +171,7 @@ export function HomePage() {
 function CatalogResults({ query }: { query: UseQueryResult<Paginated<Nft>> }) {
   if (query.isPending) return <NftGridSkeleton count={CATALOG_PAGE_SIZE} />
 
-  if (query.isError) {
+  if (query.isError && !query.data) {
     return (
       <div role="alert" className="flex flex-col items-center gap-3 py-20 text-center text-sm">
         <p className="text-muted-foreground">Não foi possível carregar os NFTs.</p>
