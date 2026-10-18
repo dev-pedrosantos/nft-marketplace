@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { createRouter } from '@tanstack/react-router'
+import { NotFoundPage } from '@/pages/not-found/not-found-page'
 import { routeTree } from '@/routeTree.gen'
 
 export interface RouterContext {
@@ -14,6 +15,7 @@ export function createAppRouter(queryClient: QueryClient) {
     // Let TanStack Query own cache freshness for preloaded data.
     defaultPreloadStaleTime: 0,
     scrollRestoration: true,
+    defaultNotFoundComponent: NotFoundPage,
   })
 }
 

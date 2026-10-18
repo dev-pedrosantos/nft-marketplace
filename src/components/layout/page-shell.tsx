@@ -6,7 +6,7 @@ import { SiteHeader, type HeaderSection } from '@/components/layout/site-header'
 import { cn } from '@/lib/utils'
 
 interface PageShellProps {
-  active: HeaderSection
+  active: HeaderSection | null
   /** The Mercado-flow screens use the header without its hairline. */
   divider?: boolean
   /** Content under the header inside the design's "Top" frame (32px gap). */

@@ -87,7 +87,7 @@ export function requireUser(request: Request) {
   return viewer
 }
 
-export function publicUser({ password: _password, ...user }: UserRecord) {
+export function publicUser({ passwordHash: _passwordHash, ...user }: UserRecord) {
   return user
 }
 

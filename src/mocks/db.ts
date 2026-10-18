@@ -12,7 +12,8 @@ import { broadcastNftUpdate } from './realtime'
  */
 
 export interface UserRecord extends User {
-  password: string
+  /** Never the password itself; see `passwords.ts`. */
+  passwordHash: string
 }
 
 export interface SessionRecord {
@@ -79,7 +80,11 @@ interface DbState {
 }
 
 const STORAGE_KEY = 'kurio.mock-db'
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 3
+
+// `hashPassword('kurio123')` for each demo account (different salts).
+const DEMO_PASSWORD_HASH = 'pbkdf2-sha256$100000$RZq/b+nq3h9pMMkCz3Ci6g==$uQ3IG0h1t21PHCOJ6n6MaTlie+42QS9znjxQAFkX2PE='
+const ANA_PASSWORD_HASH = 'pbkdf2-sha256$100000$+Xl0faM1qYJWYALzttMpdA==$UMCF82A+xhSLPAK31cZkyQdNz+CXTG7tSCh9r8m6d5k='
 export const SESSION_TTL_MS = 30 * 60 * 1000
 
 export const DEMO_USER_ID = 'user-demo'
@@ -108,7 +113,7 @@ function seed(): DbState {
       {
         id: DEMO_USER_ID,
         email: 'colecionador@kurio.com',
-        password: 'kurio123',
+        passwordHash: DEMO_PASSWORD_HASH,
         username: 'nova.sato',
         displayName: 'Nova Sato',
         ensName: 'nova.kurio',
@@ -118,7 +123,7 @@ function seed(): DbState {
       {
         id: 'user-ana',
         email: 'ana@kurio.com',
-        password: 'kurio123',
+        passwordHash: ANA_PASSWORD_HASH,
         username: 'ana.lima',
         displayName: 'Ana Lima',
         ensName: 'ana',

@@ -48,6 +48,14 @@ test.describe('detalhes do NFT', () => {
     await expect(editions.getByRole('radio', { name: '1/1 (esgotada)', exact: true })).toBeDisabled()
   })
 
+  test('NFT inexistente mostra aviso próprio e volta ao mercado', async ({ page }) => {
+    await page.goto('/nfts/nao-existe-999')
+    await expect(page.getByText('NFT não encontrado')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Tentar novamente' })).toHaveCount(0)
+    await page.getByRole('link', { name: 'Voltar ao mercado' }).click()
+    await expect(page).toHaveURL(/\/$/)
+  })
+
   test('favoritar exige sessão e persiste no perfil', async ({ page, isMobile }) => {
     await page.goto('/nfts/emerald-ape-042')
     const favorite = page.getByRole('button', { name: 'Favoritar', exact: true }).filter({ visible: true })

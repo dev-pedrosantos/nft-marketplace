@@ -3,6 +3,7 @@ import type { LoginInput, RegisterInput, Session } from '@/features/auth/types'
 import { validateLogin, validateRegister } from '@/lib/validation'
 import { MAX_QUANTITY_PER_LINE } from '../data/nfts'
 import { cartOf, commit, createId, db, SESSION_TTL_MS, type UserRecord } from '../db'
+import { hashPassword, verifyPassword } from '../passwords'
 import {
   api,
   errorResponse,
@@ -53,7 +54,7 @@ export const authHandlers: HttpHandler[] = [
     const user = db.users.find(
       (item) => item.email.toLowerCase() === body.email!.trim().toLowerCase(),
     )
-    if (!user || user.password !== body.password) {
+    if (!user || !(await verifyPassword(body.password!, user.passwordHash))) {
       return errorResponse(401, 'INVALID_CREDENTIALS', 'E-mail ou senha incorretos.')
     }
 
@@ -68,6 +69,8 @@ export const authHandlers: HttpHandler[] = [
     const body = await readJson<RegisterInput>(request)
     const invalid = validationError(validateRegister(body))
     if (invalid) return invalid
+    // Hashed before the uniqueness checks so nothing is awaited between them and the insert.
+    const passwordHash = await hashPassword(body.password!)
 
     const email = body.email!.trim().toLowerCase()
     const username = body.username!.trim()
@@ -85,7 +88,7 @@ export const authHandlers: HttpHandler[] = [
     const user: UserRecord = {
       id: createId('user'),
       email,
-      password: body.password!,
+      passwordHash,
       username,
       displayName: username,
       ensName: username.toLowerCase().replace(/[^a-z0-9-]/g, '-'),

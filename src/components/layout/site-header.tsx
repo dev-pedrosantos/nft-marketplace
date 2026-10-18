@@ -17,7 +17,8 @@ export type HeaderSection = 'home' | 'market'
 
 interface SiteHeaderProps {
   /** Highlighted nav item: "Início" on home and account screens, "Mercado" in the buying flow. */
-  active?: HeaderSection
+  /** `null` highlights no item (pages outside both sections). */
+  active?: HeaderSection | null
   /** The hairline belongs to the host screen; the buying-flow screens have none. */
   divider?: boolean
   className?: string

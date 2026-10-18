@@ -65,6 +65,37 @@ test.describe('autenticação e sessão', () => {
     await expect(page.getByLabel('Nome de usuário')).toHaveValue('nova.colecionadora')
   })
 
+  test('troca de senha confere a atual e só aceita a nova no login', async ({ page }) => {
+    const newPassword = 'nova-senha-456'
+    await login(page)
+    await page.goto('/conta/perfil')
+
+    await page.getByLabel('Senha atual').fill('senha-errada')
+    await page.getByLabel('Nova senha', { exact: true }).fill(newPassword)
+    await page.getByLabel('Confirmar nova senha').fill(newPassword)
+    await page.getByRole('button', { name: 'Salvar' }).click()
+    await expect(page.getByText('Senha atual incorreta.')).toBeVisible()
+
+    await page.getByLabel('Senha atual').fill(DEMO_USER.password)
+    await page.getByRole('button', { name: 'Salvar' }).click()
+    await expect(page.getByText('Perfil e senha atualizados.')).toBeVisible()
+
+    const stored = await page.evaluate(() => localStorage.getItem('kurio.mock-db') ?? '')
+    expect(stored).toContain('pbkdf2-sha256$')
+    expect(stored).not.toContain(newPassword)
+    expect(stored).not.toContain(DEMO_USER.password)
+
+    await page.getByRole('button', { name: 'Sair' }).click()
+    await page.goto('/?auth=login')
+    const dialog = authDialog(page)
+    await dialog.getByLabel('E-mail').fill(DEMO_USER.email)
+    await dialog.getByLabel('Senha', { exact: true }).fill(DEMO_USER.password)
+    await dialog.getByRole('button', { name: 'Entrar', exact: true }).click()
+    await expect(dialog.getByRole('alert')).toContainText(/e-mail ou senha/i)
+
+    await submitLogin(page, { email: DEMO_USER.email, password: newPassword })
+  })
+
   test('dados de um usuário não aparecem para outro', async ({ page }) => {
     await login(page)
     await page.goto('/carrinho')

@@ -9,6 +9,7 @@ import {
 } from '@/features/wallets/types'
 import { validatePasswordChange, validateProfile, validateWallet } from '@/lib/validation'
 import { commit, createId, db, findNft, randomHex } from '../db'
+import { hashPassword, verifyPassword } from '../passwords'
 import { toNft } from '../projections'
 import { isScenarioActive } from '../scenarios'
 import {
@@ -99,12 +100,12 @@ export const accountHandlers: HttpHandler[] = [
       validatePasswordChange({ ...body, confirmPassword: body.newPassword }),
     )
     if (invalid) return invalid
-    if (body.currentPassword !== viewer.user.password) {
+    if (!(await verifyPassword(body.currentPassword!, viewer.user.passwordHash))) {
       return errorResponse(422, 'VALIDATION_ERROR', 'Revise os campos destacados.', {
         currentPassword: 'Senha atual incorreta.',
       })
     }
-    viewer.user.password = body.newPassword!
+    viewer.user.passwordHash = await hashPassword(body.newPassword!)
     commit()
     return new HttpResponse(null, { status: 204 })
   }),

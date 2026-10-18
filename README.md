@@ -22,7 +22,8 @@ os desvios do Figma e as limitações estão em [`ARCHITECTURE.md`](ARCHITECTURE
 | `?auth=login` · `?auth=signup` | Login e cadastro | Diálogo sobre qualquer tela, validação, sessão persistida, logout e sessão expirada |
 
 `/checkout`, `/pedidos/*` e `/conta/*` são rotas privadas: sem sessão, o usuário vai para o login
-e volta à página pedida depois de entrar.
+e volta à página pedida depois de entrar. Qualquer outro endereço mostra "Página não encontrada",
+com link para o início.
 
 ## Stack
 
@@ -184,8 +185,9 @@ iniciais, com o cenário `no-latency` ligado.
 | Spec | Cobertura |
 | --- | --- |
 | `catalog.spec.ts` | Busca, estado vazio, ordenação por preço, paginação e abas na URL |
-| `details.spec.ts` | Edição, limite de quantidade pelo estoque, compra, edição esgotada, favoritos com login, rollback quando favoritar falha, preço e estoque via socket, eventos duplicados e fora de ordem, reconciliação após reconexão |
-| `auth.spec.ts` | Validação, credenciais inválidas, sessão após reload, logout, rota privada, sessão expirada, cadastro e isolamento entre usuários |
+| `details.spec.ts` | Edição, limite de quantidade pelo estoque, compra, edição esgotada, NFT inexistente, favoritos com login, rollback quando favoritar falha, preço e estoque via socket, eventos duplicados e fora de ordem, reconciliação após reconexão |
+| `auth.spec.ts` | Validação, credenciais inválidas, sessão após reload, logout, rota privada, sessão expirada, cadastro, troca de senha (senha atual conferida, só a nova vale no login, banco sem a senha em texto) e isolamento entre usuários |
+| `not-found.spec.ts` | Página não encontrada em endereço desconhecido, inclusive dentro de `/conta`, com volta ao início |
 | `cart.spec.ts` | Totais, cupons válidos/inválidos/expirados, quantidade, remoção, persistência e carrinho de visitante até o checkout |
 | `checkout.spec.ts` | Compra com clique duplo sem pedido duplicado, pagamento recusado, mudança de preço, timeout com recuperação idempotente, erro 503 com nova tentativa, conexão da carteira (recusa, nova tentativa, persistência, troca e desconexão) e, direto na API, pedido sem carteira, chave reutilizada com outro conteúdo (409) e requisições simultâneas com a mesma chave |
 | `orders-realtime.spec.ts` | `order.updated` recebido pelo socket do dono com versão, evento atrasado ou repetido sem tirar o pedido do status final, evento de outro usuário não entregue à sessão atual, banner de pagamento pendente após sair da página e recarregar |

@@ -77,6 +77,10 @@ formata.
   página, mesmo que o redirecionamento ainda não tenha chegado à URL.
 - **Rotas privadas:** o layout `_authenticated` redireciona para `/?auth=login&redirect=<url>`.
   O diálogo de login é controlado pela URL (`?auth=login|signup`), então abre sobre qualquer tela.
+- **Rota inexistente:** o `defaultNotFoundComponent` do router mostra "Página não encontrada" com
+  o header, o rodapé e a tab bar mobile, sem item do header destacado. Por ser uma SPA, o servidor
+  responde 200 com o `index.html` (fallback de SPA); o 404 é só visual. Um NFT ou pedido inexistente
+  na API mostra o aviso próprio da tela ("NFT não encontrado", "Pedido não encontrado").
 - **Logout** encerra a sessão no servidor e no cliente e sai das rotas privadas.
 
 ## Checkout, pagamento e idempotência
@@ -140,6 +144,11 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
 
 - **`src/mocks/db.ts`:** banco em `localStorage['kurio.mock-db']` (usuários, sessões com TTL de
   30 minutos, carrinhos, cotações, pedidos, estoque e preços), criado a partir de `src/mocks/data`.
+- **`src/mocks/passwords.ts`:** o banco guarda só o hash da senha (PBKDF2-SHA256 via
+  `crypto.subtle`, 100 mil iterações e salt aleatório por usuário), nunca o texto. Login e troca de
+  senha recalculam o hash e comparam todos os bytes. As contas de demonstração já vêm com o hash de
+  `kurio123` calculado pela mesma função. O cadastro calcula o hash antes de checar e-mail e nome de
+  usuário, para que nada seja aguardado entre a checagem e a gravação.
 - **`src/mocks/projections.ts`:** cálculo de carrinho, cupom, taxa e avisos, compartilhado pelos
   handlers.
 - **`src/mocks/handlers`:** um arquivo por domínio, com latência artificial de 250 ms, erros no
@@ -249,6 +258,9 @@ throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
 - Itens do header e do rodapé sem tela correspondente ("Criadores", "Aprenda", "Minha coleção",
   "Estúdio do criador" e a coluna "Central de ajuda") abrem, no clique, um aviso "Em breve"
   (`src/components/coming-soon.tsx`), construído sobre o diálogo compartilhado.
+- O Figma não tem frame de página não encontrada nem de carregamento. A 404 reaproveita o estado
+  vazio compartilhado, e os skeletons usam a cor `surface-raised` com um brilho que atravessa o
+  bloco (`skeleton-shimmer` em `src/index.css`), parado quando o sistema pede menos movimento.
 - As artes dos NFTs são as imagens exportadas do Figma, convertidas de PNG 1254 px para WebP 800 px
   (o maior uso é 404 px no detalhe desktop, então 800 px cobrem telas 2x).
 
@@ -260,3 +272,6 @@ throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
 - O banco simulado vive no `localStorage` do navegador e é carregado quando a aba abre. Mudanças
   feitas em outra aba só aparecem depois de recarregar, e a última aba a gravar prevalece. Outros
   navegadores não veem os dados.
+- As senhas ficam com hash no banco simulado, mas o banco inteiro (inclusive sessões) está no
+  `localStorage` do próprio navegador. O hash evita guardar a senha em texto puro, mas não substitui
+  um backend: quem tem acesso ao navegador pode alterar os dados diretamente.

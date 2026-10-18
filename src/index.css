@@ -129,6 +129,28 @@
     }
 }
 
+/* Loading placeholder: a soft highlight sweeps across the raised surface. */
+@utility skeleton-shimmer {
+  background-color: var(--surface-raised);
+  background-image: linear-gradient(
+    90deg,
+    transparent 30%,
+    color-mix(in srgb, var(--border-soft) 55%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

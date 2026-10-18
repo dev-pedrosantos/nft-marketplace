@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn('animate-pulse rounded-[6px] bg-surface-raised', className)} />
+  return <div aria-hidden className={cn('skeleton-shimmer rounded-[6px]', className)} />
 }
 
 export function LoadingState({ label, className }: { label: string; className?: string }) {
