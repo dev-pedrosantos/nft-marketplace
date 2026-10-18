@@ -184,10 +184,10 @@ iniciais, com o cenário `no-latency` ligado.
 
 | Spec | Cobertura |
 | --- | --- |
-| `catalog.spec.ts` | Busca, estado vazio, ordenação por preço, paginação, abas na URL e filtros combinados (coleção, rede e preço) conferidos contra a API, com volta à página 1 ao filtrar, refresh e voltar/avançar do navegador |
+| `catalog.spec.ts` | Busca, estado vazio, ordenação por preço, paginação, abas na URL e filtros combinados (coleção, rede e preço) conferidos contra a API, com volta à página 1 ao filtrar, refresh e voltar/avançar do navegador; drawer de filtros no mobile e a 768 px, com foco preso, Esc, foco devolvido ao botão e escolhas mantidas ao reabrir |
 | `details.spec.ts` | Edição, limite de quantidade pelo estoque, compra, edição esgotada, NFT inexistente, favoritos com login, rollback quando favoritar falha, preço e estoque via socket, eventos duplicados e fora de ordem, reconciliação após reconexão |
 | `auth.spec.ts` | Validação, credenciais inválidas, sessão após reload, logout, rota privada, sessão expirada, cadastro, conflito de e-mail e usuário no cadastro, troca de senha (senha atual conferida, só a nova vale no login, banco sem a senha em texto) e isolamento entre usuários |
-| `account.spec.ts` | Perfil com erros de validação associados aos campos, conflito de usuário vindo da API e persistência; avatar com arquivo inválido, envio, persistência e remoção; carteiras principal e secundária com validação, falha 500 sem perder os dados e persistência; validação da carteira direto na API |
+| `account.spec.ts` | Perfil com erros de validação associados aos campos, conflito de usuário vindo da API e persistência; avatar com arquivo inválido, envio, persistência e remoção; carteiras principal e secundária com validação, falha 500 sem perder os dados e persistência; cancelar a remoção devolve o foco ao botão; validação da carteira direto na API |
 | `responsive.spec.ts` | Sem rolagem horizontal em 320, 390, 768 e 1440 px nas telas públicas, da conta e do pagamento |
 | `not-found.spec.ts` | Página não encontrada em endereço desconhecido, inclusive dentro de `/conta`, com volta ao início |
 | `cart.spec.ts` | Totais, cupons válidos/inválidos/expirados, quantidade, remoção, persistência, carrinho de visitante até o checkout e preço alterado pelo socket com o carrinho aberto (aviso, resumo atualizado e finalização bloqueada até aceitar) |
@@ -208,10 +208,11 @@ no Linux (Chromium do Playwright). Depois de uma mudança visual intencional, at
 (`npm run test:e2e:report`). Testes que falham guardam trace e captura em `test-results/`; abra o
 trace com `npx playwright show-trace <arquivo>.zip`.
 
-Quatro testes rodam só no `desktop`: a ordenação do catálogo e os itens "Em breve" do header (o
-seletor e o header não existem no layout mobile do Figma), o foco visível por Tab (cenário de
-teclado físico) e o hover sem abrir o aviso (não há hover em toque). Todo o resto roda nos dois
-projetos.
+Seis testes rodam só no `desktop`: os itens "Em breve" do header (o header não existe no layout
+mobile do Figma), os filtros combinados pela coluna lateral (que só aparece a partir de 1024 px; no
+mobile os mesmos filtros são testados pelo drawer), o foco visível por Tab (cenário de teclado
+físico), o hover sem abrir o aviso (não há hover em toque) e os dois testes de overflow, que já
+percorrem as larguras de 320 a 1440 px. Todo o resto roda nos dois projetos.
 
 **Linux / WSL:** o Chromium precisa de bibliotecas do sistema. Se aparecer
 `error while loading shared libraries: libnspr4.so`, instale-as:

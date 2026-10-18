@@ -1,5 +1,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import filterIcon from '@/assets/icons/filter.svg'
 import { MobileSearchBar } from '@/components/layout/mobile-search-bar'
 import { MobileTabBar } from '@/components/layout/mobile-tab-bar'
 import { SiteFooter } from '@/components/layout/site-footer'
@@ -9,11 +11,12 @@ import { blogQueries } from '@/features/blog/api'
 import { BlogPostCard } from '@/features/blog/components/blog-post-card'
 import { nftQueries } from '@/features/nfts/api'
 import { CatalogFilters } from '@/features/nfts/components/catalog-filters'
+import { CatalogFiltersDrawer } from '@/features/nfts/components/catalog-filters-drawer'
 import { FeaturedNftBanner } from '@/features/nfts/components/featured-nft-banner'
 import { NftGrid, NftGridSkeleton } from '@/features/nfts/components/nft-grid'
 import { NftTabs } from '@/features/nfts/components/nft-tabs'
 import { SortLabel } from '@/features/nfts/components/sort-label'
-import type { Nft, NftListParams } from '@/features/nfts/types'
+import type { Nft, NftListParams, NftSort } from '@/features/nfts/types'
 import { promotionQueries } from '@/features/promotions/api'
 import { PromoCard } from '@/features/promotions/components/promo-card'
 import type { Paginated } from '@/types/api'
@@ -22,6 +25,7 @@ import type { HomeSearch } from './search'
 
 const BLOG_POST_LIMIT = 4
 const CATALOG_PAGE_SIZE = 8
+const DESKTOP_FILTERS_QUERY = '(min-width: 64rem)'
 
 export function HomePage() {
   const search = useSearch({ from: '/' })
@@ -55,12 +59,47 @@ export function HomePage() {
     enabled: !filtersQuery.isPending,
   })
 
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  // The sidebar takes over at `lg`, so a drawer left open while resizing would only cover it.
+  useEffect(() => {
+    const desktop = window.matchMedia(DESKTOP_FILTERS_QUERY)
+    const close = () => desktop.matches && setFiltersOpen(false)
+    desktop.addEventListener('change', close)
+    return () => desktop.removeEventListener('change', close)
+  }, [])
+
   const updateSearch = (patch: Partial<HomeSearch>, options?: { replace?: boolean }) =>
     navigate({
       search: (previous) => ({ ...previous, page: undefined, ...patch }),
       replace: options?.replace,
       resetScroll: false,
     })
+
+  const sort = listParams.sort ?? 'recent'
+  const onSortChange = (value: NftSort) =>
+    updateSearch({ sort: value === 'recent' ? undefined : value })
+
+  const renderFilters = (className?: string) =>
+    filters &&
+    price && (
+      <CatalogFilters
+        key={`${price.min}-${price.max}`}
+        className={className}
+        filters={filters}
+        collection={collection}
+        network={search.network}
+        price={price}
+        onCollectionChange={(id) => updateSearch({ collection: id })}
+        onNetworkChange={(id) => updateSearch({ network: id === search.network ? undefined : id })}
+        onPriceApply={(range) =>
+          updateSearch({
+            minPrice: range.min === priceBounds.min ? undefined : range.min,
+            maxPrice: range.max === priceBounds.max ? undefined : range.max,
+          })
+        }
+      />
+    )
 
   return (
     <>
@@ -74,6 +113,8 @@ export function HomePage() {
           className="md:hidden"
           value={search.q ?? ''}
           onChange={(value) => updateSearch({ q: value || undefined }, { replace: true })}
+          onOpenFilters={() => setFiltersOpen(true)}
+          filtersOpen={filtersOpen}
         />
         <MobileHeroBanner className="md:hidden" />
 
@@ -83,25 +124,7 @@ export function HomePage() {
           className="flex scroll-mt-6 items-start gap-12"
         >
           <aside className="hidden w-[310px] shrink-0 flex-col gap-6 lg:flex">
-            {filters && price && (
-              <CatalogFilters
-                key={`${price.min}-${price.max}`}
-                filters={filters}
-                collection={collection}
-                network={search.network}
-                price={price}
-                onCollectionChange={(id) => updateSearch({ collection: id })}
-                onNetworkChange={(id) =>
-                  updateSearch({ network: id === search.network ? undefined : id })
-                }
-                onPriceApply={(range) =>
-                  updateSearch({
-                    minPrice: range.min === priceBounds.min ? undefined : range.min,
-                    maxPrice: range.max === priceBounds.max ? undefined : range.max,
-                  })
-                }
-              />
-            )}
+            {renderFilters()}
             {featuredQuery.data && <FeaturedNftBanner nft={featuredQuery.data} />}
           </aside>
 
@@ -112,11 +135,19 @@ export function HomePage() {
                   value={listParams.tab}
                   onChange={(tab) => updateSearch({ tab: tab === 'all' ? undefined : tab })}
                 />
-                <SortLabel
-                  value={listParams.sort ?? 'recent'}
-                  onChange={(sort) => updateSearch({ sort: sort === 'recent' ? undefined : sort })}
-                  className="max-md:hidden"
-                />
+                <div className="flex items-center gap-6 max-md:hidden">
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-expanded={filtersOpen}
+                    onClick={() => setFiltersOpen(true)}
+                    className="flex h-9 shrink-0 items-center gap-2 rounded-[10px] bg-[linear-gradient(137.05deg,rgba(210,138,76,0.45)_24.6%,#d28a4c_100%)] px-3 text-sm font-bold text-ink lg:hidden"
+                  >
+                    <img src={filterIcon} alt="" className="size-4" />
+                    Filtros
+                  </button>
+                  <SortLabel value={sort} onChange={onSortChange} className="max-lg:hidden" />
+                </div>
               </div>
 
               <CatalogResults query={nftsQuery} />
@@ -164,6 +195,15 @@ export function HomePage() {
       </div>
 
       <MobileTabBar className="md:hidden" />
+
+      <CatalogFiltersDrawer
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        sort={sort}
+        onSortChange={onSortChange}
+      >
+        {renderFilters('p-0')}
+      </CatalogFiltersDrawer>
     </>
   )
 }

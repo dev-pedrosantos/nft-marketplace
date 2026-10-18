@@ -132,6 +132,14 @@ test.describe('carteiras', () => {
 
     await page.reload()
     await expect(secondaryWallet(page)).toContainText('Cofre frio')
+
+    const remove = secondaryWallet(page).getByRole('button', { name: 'Remover' })
+    await remove.click()
+    const confirm = page.getByRole('dialog', { name: 'Remover carteira secundária?' })
+    await confirm.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(confirm).toBeHidden()
+    await expect(remove).toBeFocused()
+    await expect(secondaryWallet(page)).toContainText('Cofre frio')
   })
 
   test('a API valida a carteira mesmo sem passar pelo formulário', async ({ page }) => {

@@ -68,9 +68,15 @@ export function CatalogFilters({
   )
 }
 
-function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
+interface FilterGroupProps {
+  title: string
+  children: React.ReactNode
+  className?: string
+}
+
+export function FilterGroup({ title, children, className }: FilterGroupProps) {
   return (
-    <section className="flex flex-col gap-3">
+    <section className={cn('flex flex-col gap-3', className)}>
       <h2 className="text-lg leading-4 font-bold">{title}</h2>
       {children}
     </section>
@@ -78,14 +84,14 @@ function FilterGroup({ title, children }: { title: string; children: React.React
 }
 
 interface OptionListProps {
-  options: CatalogFilterOption[]
+  options: (Omit<CatalogFilterOption, 'count'> & { count?: number })[]
   selected?: string
   onSelect: (id: string) => void
   boldCount?: boolean
   className?: string
 }
 
-function OptionList({ options, selected, onSelect, boldCount, className }: OptionListProps) {
+export function OptionList({ options, selected, onSelect, boldCount, className }: OptionListProps) {
   return (
     <ul className={cn('flex flex-col', className)}>
       {options.map((option) => {
@@ -102,7 +108,9 @@ function OptionList({ options, selected, onSelect, boldCount, className }: Optio
               )}
             >
               <span>{option.label}</span>
-              <span className={cn('text-right', boldCount && 'font-bold')}>({option.count})</span>
+              {option.count !== undefined && (
+                <span className={cn('text-right', boldCount && 'font-bold')}>({option.count})</span>
+              )}
             </button>
           </li>
         )

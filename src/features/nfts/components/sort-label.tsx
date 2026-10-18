@@ -1,13 +1,8 @@
 import { useId } from 'react'
 import chevronDown from '@/assets/icons/chevron-down.svg'
 import { cn } from '@/lib/utils'
+import { SORT_OPTIONS } from '../sort-options'
 import type { NftSort } from '../types'
-
-const SORT_OPTIONS: { value: NftSort; label: string }[] = [
-  { value: 'recent', label: 'Listados recentemente' },
-  { value: 'price-asc', label: 'Menor preço' },
-  { value: 'price-desc', label: 'Maior preço' },
-]
 
 interface SortLabelProps {
   value: NftSort

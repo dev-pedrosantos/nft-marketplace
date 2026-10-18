@@ -6,10 +6,18 @@ import { cn } from '@/lib/utils'
 interface MobileSearchBarProps {
   value: string
   onChange: (value: string) => void
+  onOpenFilters: () => void
+  filtersOpen: boolean
   className?: string
 }
 
-export function MobileSearchBar({ value, onChange, className }: MobileSearchBarProps) {
+export function MobileSearchBar({
+  value,
+  onChange,
+  onOpenFilters,
+  filtersOpen,
+  className,
+}: MobileSearchBarProps) {
   const inputId = useId()
 
   return (
@@ -32,6 +40,9 @@ export function MobileSearchBar({ value, onChange, className }: MobileSearchBarP
       <button
         type="button"
         aria-label="Filtros"
+        aria-haspopup="dialog"
+        aria-expanded={filtersOpen}
+        onClick={onOpenFilters}
         className="relative size-[45px] shrink-0 rounded-[14px] bg-[linear-gradient(137.05deg,rgba(210,138,76,0.45)_24.6%,#d28a4c_100%)]"
       >
         <img

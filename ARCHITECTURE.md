@@ -186,7 +186,9 @@ O fluxo fica em `src/features/orders/use-checkout.ts`:
 - O rodapé usa as medidas fixas do frame desktop só a partir de 1440 px (breakpoint `wide`, em
   `index.css`). Entre 1024 e 1439 px ele usa a grade do tablet; com as medidas do Figma, títulos se
   sobrepunham e os links vazavam do rodapé a 1280 px.
-- Diálogos usam Radix (foco preso, Escape, título acessível). Grupos de escolha usam
+- Diálogos usam Radix (foco preso, Escape, título acessível). O Radix só devolve o foco a um
+  `DialogTrigger`, e a maioria dos diálogos abre por estado, então `DialogContent` guarda o elemento
+  focado na abertura e volta a ele ao fechar. Grupos de escolha usam
   `role="radiogroup"`, quantidades têm rótulos por item e mensagens de erro usam `role="alert"`.
 - Foco visível global para teclado (`:focus-visible`) e `prefers-reduced-motion` reduzindo
   animações e rolagem suave.
@@ -268,6 +270,12 @@ throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
 - Itens do header e do rodapé sem tela correspondente ("Criadores", "Aprenda", "Minha coleção",
   "Estúdio do criador" e a coluna "Central de ajuda") abrem, no clique, um aviso "Em breve"
   (`src/components/coming-soon.tsx`), construído sobre o diálogo compartilhado.
+- O Figma só desenha a coluna de filtros e o seletor de ordenação no desktop, e o botão de filtros
+  do frame mobile não tem tela. Abaixo de 1024 px os dois abrem num drawer
+  (`catalog-filters-drawer.tsx`) com os mesmos componentes e o mesmo estado na URL: painel inferior
+  no mobile, pelo botão ao lado da busca, e painel lateral no tablet, por um botão "Filtros" que só
+  existe entre 768 e 1023 px, no lugar da ordenação. As escolhas valem na hora, e "Ver resultados"
+  só fecha o painel. A Home em repouso a 390 e a 1440 px não muda.
 - A 320 px (equivalente a 400% de zoom em 1280 px) a coluna do rodapé ficava 3 px mais larga que a
   tela; ela passou a ser limitada à largura disponível. De 390 px para cima nada muda, e as
   baselines visuais seguem iguais.

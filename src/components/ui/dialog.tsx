@@ -1,5 +1,5 @@
 import { Dialog as DialogPrimitive } from 'radix-ui'
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import closeIcon from '@/assets/icons/close.svg'
 import { cn } from '@/lib/utils'
 
@@ -22,7 +22,11 @@ interface DialogContentProps {
   onOpenAutoFocus?: (event: Event) => void
 }
 
-/** Focus trap, Escape and scroll lock come from Radix. */
+/**
+ * Focus trap, Escape and scroll lock come from Radix. Radix only returns focus to a
+ * `DialogTrigger`, and most dialogs here are opened from state, so the element that
+ * had focus when the dialog opened is remembered and focused again on close.
+ */
 export function DialogContent({
   children,
   className,
@@ -33,6 +37,8 @@ export function DialogContent({
   closeClassName,
   onOpenAutoFocus,
 }: DialogContentProps) {
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -42,7 +48,17 @@ export function DialogContent({
         )}
       />
       <DialogPrimitive.Content
-        onOpenAutoFocus={onOpenAutoFocus}
+        onOpenAutoFocus={(event) => {
+          returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+          onOpenAutoFocus?.(event)
+        }}
+        onCloseAutoFocus={(event) => {
+          const target = returnFocusRef.current
+          if (target?.isConnected) {
+            event.preventDefault()
+            target.focus()
+          }
+        }}
         className={cn(
           'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] -translate-1/2 overflow-y-auto bg-surface-card outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
           className,
