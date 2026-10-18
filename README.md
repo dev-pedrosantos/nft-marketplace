@@ -251,8 +251,11 @@ Gera o build de demonstração, serve com `vite preview` e audita Início e Deta
 perfis mobile e desktop. A configuração versionada fica em `lighthouse/config.mjs`; os relatórios
 HTML/JSON de cada execução vão para `lighthouse/reports/`, e as medianas por categoria, LCP, CLS,
 TBT, versões e ambiente vão para [`lighthouse/summary.md`](lighthouse/summary.md) e
-`lighthouse/summary.json`. O Chrome usado é o Chromium do Playwright (ou `CHROME_PATH`). A análise
-dos resultados abaixo da meta está em `ARCHITECTURE.md`.
+`lighthouse/summary.json`. O Chrome usado é o Chromium do Playwright (ou `CHROME_PATH`).
+
+Última auditoria: Performance 96 (Início) e 95 (Detalhe) no mobile e 100 no desktop; Accessibility,
+Best Practices e SEO em 100 nos dois perfis. A cadeia de carregamento e as otimizações estão em
+`ARCHITECTURE.md`.
 
 ## Estrutura do projeto
 

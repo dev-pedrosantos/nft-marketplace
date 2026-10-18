@@ -21,9 +21,13 @@ export default defineConfig({
     tailwindcss(),
   ],
   resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
+    alias: [
+      { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
+      {
+        find: /^tough-cookie$/,
+        replacement: fileURLToPath(new URL('./src/mocks/shims/tough-cookie.ts', import.meta.url)),
+      },
+    ],
   },
   server: {
     watch: {

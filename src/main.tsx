@@ -1,5 +1,3 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
 import './index.css'
 
 async function enableMocking() {
@@ -9,14 +7,11 @@ async function enableMocking() {
   await startMockWorker()
 }
 
+// React does not touch `WebSocket`, so it downloads alongside MSW instead of before it.
+const renderer = import('./render.tsx')
+
 // The app is imported only after MSW patches `WebSocket`: engine.io-client captures the
 // constructor when its module is evaluated, and would otherwise bypass the socket mock.
-enableMocking()
-  .then(() => import('./App.tsx'))
-  .then(({ default: App }) => {
-    createRoot(document.getElementById('root')!).render(
-      <StrictMode>
-        <App />
-      </StrictMode>,
-    )
-  })
+const app = enableMocking().then(() => import('./App.tsx'))
+
+Promise.all([renderer, app]).then(([{ render }, { default: App }]) => render(App))

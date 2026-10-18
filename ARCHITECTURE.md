@@ -220,20 +220,16 @@ throttling simulado. O script grava os relatórios HTML/JSON de cada execução 
 `lighthouse/summary.json`. O Chrome é iniciado pelo próprio script (o `chrome-launcher` não
 funciona no WSL) com o Chromium do Playwright, ou com `CHROME_PATH`.
 
-Desktop fica em 99–100 em todas as categorias. No mobile, Accessibility, Best Practices e SEO ficam
-em 100; Performance fica abaixo de 90 (mediana em `lighthouse/summary.md`, entre 84 e 89 conforme a
-execução), com CLS ~0 e LCP entre 3,2 e 3,5 s.
+Desktop fica em 100 em todas as categorias. No mobile, Performance fica em 95–96 (Início e
+Detalhe; medianas em `lighthouse/summary.md`), com LCP entre 2,4 e 2,6 s e CLS ~0, e
+Accessibility, Best Practices e SEO ficam em 100.
 
-No mobile, o LCP da Início é o fundo do banner (um SVG embutido), que no navegador sem throttling
-pinta junto com o primeiro conteúdo, por volta de 356 ms. O LCP simulado soma a cadeia de
-JavaScript e as requisições iniciadas antes dessa pintura (API, fonte e as artes do banner), que
-disputam a mesma banda de 4G lento.
-
-**Causa:** sem SSR, a primeira pintura depende de baixar e executar a cadeia de JavaScript na CPU
-simulada 4x mais lenta: entrada (React) → chunk do MSW (173 KB gzip) → registro do service worker →
-chunk do app. A ordem é obrigatória: o app só pode ser avaliado depois que o MSW intercepta o
-`WebSocket`, porque o `engine.io-client` captura o construtor ao carregar. No navegador sem
-throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
+**Cadeia de carregamento:** sem SSR, a primeira pintura depende de baixar e executar JavaScript na
+CPU simulada 4x mais lenta. O app só pode ser avaliado depois que o MSW intercepta o `WebSocket`,
+porque o `engine.io-client` captura o construtor ao carregar. Por isso `main.tsx` não importa nada
+pesado: a entrada tem 1,4 KB gzip e dispara ao mesmo tempo o React (`render.tsx`, 65 KB) e o chunk
+do MSW (54 KB). O chunk do app (48 KB) vem depois que o service worker está ativo. No mobile, o LCP
+da Início é o fundo do banner (um SVG embutido); o do Detalhe é a arte do NFT.
 
 **O que foi feito:**
 
@@ -248,6 +244,14 @@ throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
 - A lista do catálogo não espera mais `/catalog/filters`: sem `collection`, a API aplica a primeira
   coleção, a mesma que a Início mostra selecionada. No navegador sem throttling os cards chegam
   por volta de 670 ms em vez de 950 ms; a nota simulada não muda, porque o LCP é o banner.
+- O MSW usa `tough-cookie` (e, por ele, a lista de sufixos públicos do `tldts`) só para guardar
+  cookies de respostas simuladas. A API mockada usa token Bearer e não envia `Set-Cookie`, então
+  um alias no `vite.config.ts` troca o pacote por `src/mocks/shims/tough-cookie.ts`, que não
+  guarda nada. O chunk do MSW caiu de 174 para 54 KB gzip: Performance mobile de ~86 para ~92
+  (Início) e de ~84 para ~90 (Detalhe), medianas de 5 execuções.
+- React e react-dom saíram do chunk de entrada para `render.tsx`, importado em paralelo ao MSW em
+  vez de antes dele: a entrada caiu de 70 para 1,4 KB gzip, e a Performance mobile foi para ~96
+  (Início) e ~93–95 (Detalhe), com FCP de 2,0 para 1,7 s.
 - Um `h2` só para leitores de tela abre a seção do catálogo. No mobile a coluna de filtros fica
   oculta e os títulos dos cards vinham logo depois do `h1`: Accessibility da Início mobile de 99
   para 100.
@@ -259,6 +263,8 @@ throttling, o primeiro conteúdo e o LCP aparecem por volta de 350 ms.
 - Remover o MSW, adiar a interceptação do socket ou prerenderizar o HTML só para a auditoria.
 - Adiar as chamadas à API para depois da primeira pintura: tiraria essas requisições da conta do
   LCP simulado, mas atrasaria o catálogo para o usuário real só para melhorar a medição.
+- Baixar o chunk do app em paralelo ao MSW: exigiria carregar o `socket.io-client` sob demanda e
+  tornar a conexão do socket assíncrona, e as metas já são atingidas sem isso.
 
 ## Desvios do Figma e decisões de UX
 
